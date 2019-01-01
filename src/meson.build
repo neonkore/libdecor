@@ -55,6 +55,7 @@ libdecoration = shared_library('decoration',
     libdecoration_built_sources,
   ],
   include_directories: libdecoration_includes,
+  c_args: libdecoration_c_args,
   dependencies: [
     wayland_client_dep,
   ],

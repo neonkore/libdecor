@@ -90,7 +90,7 @@ struct libdecor_frame {
 static void
 do_map(struct libdecor_frame *frame);
 
-struct libdecor_state *
+LIBDECOR_EXPORT struct libdecor_state *
 libdecor_state_new(int width,
 		   int height)
 {
@@ -103,7 +103,7 @@ libdecor_state_new(int width,
 	return state;
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_state_free(struct libdecor_state *state)
 {
 	free(state);
@@ -135,7 +135,7 @@ window_size_to_content_size(int window_width,
 	*content_height = window_height;
 }
 
-bool
+LIBDECOR_EXPORT bool
 libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,
 					int *width,
 					int *height)
@@ -158,7 +158,7 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 	return true;
 }
 
-bool
+LIBDECOR_EXPORT bool
 libdecor_configuration_get_window_state(struct libdecor_configuration *configuration,
 					enum libdecor_window_state *window_state)
 {
@@ -278,7 +278,7 @@ init_shell_surface(struct libdecor_frame *frame)
 		do_map(frame);
 }
 
-struct libdecor_frame *
+LIBDECOR_EXPORT struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,
 		  struct wl_surface *wl_surface,
 		  struct libdecor_frame_interface *iface,
@@ -305,13 +305,13 @@ libdecor_decorate(struct libdecor *context,
 	return frame;
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_ref(struct libdecor_frame *frame)
 {
 	frame->ref_count++;
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_unref(struct libdecor_frame *frame)
 {
 	frame->ref_count--;
@@ -347,7 +347,7 @@ edge_to_xdg_edge(enum libdecor_resize_edge edge)
 	abort();
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
 					  struct wl_seat *wl_seat,
 					  uint32_t serial,
@@ -359,7 +359,7 @@ libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
 	xdg_toplevel_resize(frame->xdg_toplevel, wl_seat, serial, xdg_edge);
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
 					struct wl_seat *wl_seat,
 					uint32_t serial)
@@ -367,19 +367,19 @@ libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
 	xdg_toplevel_move(frame->xdg_toplevel, wl_seat, serial);
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_request_maximize(struct libdecor_frame *frame)
 {
 	xdg_toplevel_set_maximized(frame->xdg_toplevel);
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_request_unmaximize(struct libdecor_frame *frame)
 {
 	xdg_toplevel_unset_maximized(frame->xdg_toplevel);
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_state *state,
 		      struct libdecor_configuration *configuration)
@@ -397,7 +397,7 @@ do_map(struct libdecor_frame *frame)
 	wl_surface_commit(frame->wl_surface);
 }
 
-void
+LIBDECOR_EXPORT void
 libdecor_frame_map(struct libdecor_frame *frame)
 {
 	if (!frame->xdg_surface) {
@@ -510,7 +510,7 @@ static const struct wl_callback_listener init_wl_display_callback_listener = {
 	init_wl_display_callback
 };
 
-void
+LIBDECOR_EXPORT void
 libdecor_unref(struct libdecor *context)
 {
 	context->ref_count--;
@@ -522,7 +522,7 @@ libdecor_unref(struct libdecor *context)
 	}
 }
 
-struct libdecor *
+LIBDECOR_EXPORT struct libdecor *
 libdecor_new(struct wl_display *wl_display,
 	     struct libdecor_interface *iface)
 {

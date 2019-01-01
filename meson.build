@@ -24,6 +24,10 @@ foreach function : required_functions
   endif
 endforeach
 
+libdecoration_c_args = [
+  '-fvisibility=hidden',
+]
+
 cdata = configuration_data()
 cdata.set_quoted('VERSION', meson.project_version())
 
