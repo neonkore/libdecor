@@ -40,6 +40,8 @@ extern "C" {
 #define LIBDECOR_EXPORT
 #endif
 
+struct xdg_toplevel *parent;
+
 struct libdecor;
 struct libdecor_frame;
 struct libdecor_configuration;
@@ -97,6 +99,35 @@ libdecor_frame_ref(struct libdecor_frame *frame);
 
 void
 libdecor_frame_unref(struct libdecor_frame *frame);
+
+void
+libdecor_frame_set_parent(struct libdecor_frame *frame,
+			  struct xdg_toplevel *parent);
+
+void
+libdecor_frame_set_title(struct libdecor_frame *frame,
+			 const char *title);
+
+void
+libdecor_frame_set_app_id(struct libdecor_frame *frame,
+			  const char *app_id);
+
+void
+libdecor_frame_show_window_menu(struct libdecor_frame *frame,
+				struct wl_seat *wl_seat,
+				uint32_t serial,
+				int x,
+				int y);
+
+void
+libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
+				    int content_width,
+				    int content_height);
+
+void
+libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
+				    int content_width,
+				    int content_height);
 
 void
 libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,

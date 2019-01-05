@@ -326,6 +326,8 @@ main(int argc,
 	context = libdecor_new(wl_display, &libdecor_iface);
 	window->frame = libdecor_decorate(context, window->wl_surface,
 					  &libdecor_frame_iface, window);
+	libdecor_frame_set_app_id(window->frame, "libdecoration-demo");
+	libdecor_frame_set_title(window->frame, "libdecoration demo");
 	libdecor_frame_map(window->frame);
 
 	while (ret != -1)

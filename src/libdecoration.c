@@ -90,6 +90,16 @@ struct libdecor_frame_private {
 
 	bool pending_map;
 
+	struct {
+		char *app_id;
+		char *title;
+		int min_content_width;
+		int min_content_height;
+		int max_content_width;
+		int max_content_height;
+		struct xdg_toplevel *parent;
+	} state;
+
 	struct libdecor_configuration *pending_configuration;
 
 	int content_width;
@@ -291,6 +301,26 @@ init_shell_surface(struct libdecor_frame *frame)
 				  &xdg_toplevel_listener,
 				  frame);
 
+	if (frame_priv->state.parent) {
+		xdg_toplevel_set_parent(frame_priv->xdg_toplevel,
+					frame_priv->state.parent);
+	}
+	if (frame_priv->state.title) {
+		xdg_toplevel_set_title(frame_priv->xdg_toplevel,
+				       frame_priv->state.title);
+	}
+	if (frame_priv->state.app_id) {
+		xdg_toplevel_set_app_id(frame_priv->xdg_toplevel,
+					frame_priv->state.app_id);
+	}
+	if (frame_priv->state.min_content_width > 0 ||
+	    frame_priv->state.min_content_height > 0) {
+		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
+					  frame_priv->state.min_content_width,
+					  frame_priv->state.min_content_height);
+
+	}
+
 	if (frame_priv->pending_map)
 		do_map(frame);
 }
@@ -350,8 +380,110 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 
 		plugin->iface->frame_free(plugin, frame);
 
+		free(frame_priv->state.title);
+		free(frame_priv->state.app_id);
+
 		free(frame);
 	}
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_parent(struct libdecor_frame *frame,
+			  struct xdg_toplevel *parent)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->state.parent = parent;
+
+	if (!frame_priv->xdg_toplevel)
+		return;
+
+	xdg_toplevel_set_parent(frame_priv->xdg_toplevel, parent);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_title(struct libdecor_frame *frame,
+			 const char *title)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	free(frame_priv->state.title);
+	frame_priv->state.title = strdup(title);
+
+	if (!frame_priv->xdg_toplevel)
+		return;
+
+	xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_app_id(struct libdecor_frame *frame,
+			  const char *app_id)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	free(frame_priv->state.app_id);
+	frame_priv->state.app_id = strdup(app_id);
+
+	if (!frame_priv->xdg_toplevel)
+		return;
+
+	xdg_toplevel_set_app_id(frame_priv->xdg_toplevel, app_id);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_show_window_menu(struct libdecor_frame *frame,
+				struct wl_seat *wl_seat,
+				uint32_t serial,
+				int x,
+				int y)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	if (!frame_priv->xdg_toplevel) {
+		fprintf(stderr, "Can't show window menu before being mapped\n");
+		return;
+	}
+
+	xdg_toplevel_show_window_menu(frame_priv->xdg_toplevel,
+				      wl_seat, serial,
+				      x, y);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
+				    int content_width,
+				    int content_height)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->state.max_content_width = content_width;
+	frame_priv->state.max_content_height = content_height;
+
+	if (!frame_priv->xdg_toplevel)
+		return;
+
+	xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
+				  content_width,
+				  content_height);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
+				    int content_width,
+				    int content_height)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->state.min_content_width = content_width;
+	frame_priv->state.min_content_height = content_height;
+
+	if (!frame_priv->xdg_toplevel)
+		return;
+
+	xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
+				  content_width,
+				  content_height);
 }
 
 enum xdg_toplevel_resize_edge
