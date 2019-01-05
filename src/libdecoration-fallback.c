@@ -34,8 +34,35 @@ libdecor_plugin_fallback_destroy(struct libdecor_plugin *plugin)
 	free(plugin);
 }
 
+static struct libdecor_frame *
+libdecor_plugin_fallback_frame_new(struct libdecor_plugin *plugin)
+{
+	struct libdecor_frame *frame;
+
+	frame = zalloc(sizeof *frame);
+
+	return frame;
+}
+
+static void
+libdecor_plugin_fallback_frame_free(struct libdecor_plugin *plugin,
+				    struct libdecor_frame *frame)
+{
+}
+
+static void
+libdecor_plugin_fallback_frame_commit(struct libdecor_plugin *plugin,
+				      struct libdecor_frame *frame,
+				      struct libdecor_state *state,
+				      struct libdecor_configuration *configuration)
+{
+}
+
 static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.destroy = libdecor_plugin_fallback_destroy,
+	.frame_new = libdecor_plugin_fallback_frame_new,
+	.frame_free = libdecor_plugin_fallback_frame_free,
+	.frame_commit = libdecor_plugin_fallback_frame_commit,
 };
 
 struct libdecor_plugin *

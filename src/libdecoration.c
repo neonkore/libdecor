@@ -50,7 +50,6 @@ struct libdecor {
 
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
-	struct wl_subcompositor *wl_subcompositor;
 	struct xdg_wm_base *xdg_wm_base;
 
 	struct wl_callback *init_callback;
@@ -93,6 +92,10 @@ struct libdecor_frame_private {
 
 	struct libdecor_configuration *pending_configuration;
 
+	int content_width;
+	int content_height;
+
+	enum libdecor_window_state window_state;
 };
 
 static void
@@ -298,13 +301,16 @@ libdecor_decorate(struct libdecor *context,
 		  struct libdecor_frame_interface *iface,
 		  void *user_data)
 {
+	struct libdecor_plugin *plugin = context->plugin;
 	struct libdecor_frame *frame;
 	struct libdecor_frame_private *frame_priv;
 
 	if (context->has_error)
 		return NULL;
 
-	frame = zalloc(sizeof *frame);
+	frame = plugin->iface->frame_new(plugin);
+	if (!frame)
+		return NULL;
 
 	frame_priv = zalloc(sizeof *frame_priv);
 	frame->priv = frame_priv;
@@ -339,6 +345,11 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 
 	frame_priv->ref_count--;
 	if (frame_priv->ref_count == 0) {
+		struct libdecor *context = frame_priv->context;
+		struct libdecor_plugin *plugin = context->plugin;
+
+		plugin->iface->frame_free(plugin, frame);
+
 		free(frame);
 	}
 }
@@ -410,12 +421,34 @@ libdecor_frame_request_unmaximize(struct libdecor_frame *frame)
 	xdg_toplevel_unset_maximized(frame_priv->xdg_toplevel);
 }
 
+static void
+libdecor_frame_apply_state(struct libdecor_frame *frame,
+			   struct libdecor_state *state,
+			   struct libdecor_configuration *configuration)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->content_width = state->content_width;
+	frame_priv->content_height = state->content_height;
+
+	if (configuration) {
+		if (configuration->has_window_state)
+			frame_priv->window_state = configuration->window_state;
+	}
+}
+
 LIBDECOR_EXPORT void
 libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_state *state,
 		      struct libdecor_configuration *configuration)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	libdecor_frame_apply_state(frame, state, configuration);
+
+	plugin->iface->frame_commit(plugin, frame, state, configuration);
 
 	if (configuration) {
 		xdg_surface_ack_configure(frame_priv->xdg_surface,
@@ -445,6 +478,46 @@ libdecor_frame_map(struct libdecor_frame *frame)
 	do_map(frame);
 }
 
+LIBDECOR_EXPORT struct wl_surface *
+libdecor_frame_get_wl_surface(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	return frame_priv->wl_surface;
+}
+
+LIBDECOR_EXPORT struct xdg_surface *
+libdecor_frame_get_xdg_surface(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	return frame_priv->xdg_surface;
+}
+
+LIBDECOR_EXPORT int
+libdecor_frame_get_content_width(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	return frame_priv->content_width;
+}
+
+LIBDECOR_EXPORT int
+libdecor_frame_get_content_height(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	return frame_priv->content_height;
+}
+
+LIBDECOR_EXPORT enum libdecor_window_state
+libdecor_frame_get_window_state(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	return frame_priv->window_state;
+}
+
 static void
 xdg_wm_base_ping(void *user_data,
 		 struct xdg_wm_base *xdg_wm_base,
@@ -472,17 +545,6 @@ init_xdg_wm_base(struct libdecor *context,
 }
 
 static void
-init_wl_subcompositor(struct libdecor *context,
-		      uint32_t id,
-		      uint32_t version)
-{
-	context->wl_subcompositor = wl_registry_bind(context->wl_registry,
-						     id,
-						     &wl_subcompositor_interface,
-						     1);
-}
-
-static void
 registry_handle_global(void *user_data,
 		       struct wl_registry *wl_registry,
 		       uint32_t id,
@@ -493,8 +555,6 @@ registry_handle_global(void *user_data,
 
 	if (strcmp(interface, "xdg_wm_base") == 0)
 		init_xdg_wm_base(context, id, version);
-	else if (strcmp(interface, "wl_subcompositor") == 0)
-		init_wl_subcompositor(context, id, version);
 }
 
 static void

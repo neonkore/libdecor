@@ -28,6 +28,8 @@
 
 #include <stdlib.h>
 
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+
 static inline void *
 zalloc(size_t size)
 {

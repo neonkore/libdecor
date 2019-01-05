@@ -47,7 +47,33 @@ typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor
 
 struct libdecor_plugin_interface {
 	void (* destroy)(struct libdecor_plugin *plugin);
+
+	struct libdecor_frame * (* frame_new)(struct libdecor_plugin *plugin);
+	void (* frame_free)(struct libdecor_plugin *plugin,
+			    struct libdecor_frame *frame);
+	void (* frame_commit)(struct libdecor_plugin *plugin,
+			      struct libdecor_frame *frame,
+			      struct libdecor_state *state,
+			      struct libdecor_configuration *configuration);
 };
+
+struct wl_surface *
+libdecor_frame_get_wl_surface(struct libdecor_frame *frame);
+
+struct xdg_surface *
+libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
+
+int
+libdecor_frame_get_content_width(struct libdecor_frame *frame);
+
+int
+libdecor_frame_get_content_height(struct libdecor_frame *frame);
+
+enum libdecor_window_state
+libdecor_frame_get_window_state(struct libdecor_frame *frame);
+
+struct wl_display *
+libdecor_get_wl_display(struct libdecor *context);
 
 void
 libdecor_notify_plugin_ready(struct libdecor *context);

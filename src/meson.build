@@ -70,3 +70,5 @@ libdecoration_dep = declare_dependency(
     wayland_client_dep,
   ],
 )
+
+subdir('plugins')
