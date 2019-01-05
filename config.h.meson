@@ -1,2 +1,5 @@
 /* Version number of package */
 #mesondefine VERSION
+
+/* Plugin directiory path */
+#mesondefine LIBDECOR_PLUGIN_DIR

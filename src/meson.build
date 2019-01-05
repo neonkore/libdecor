@@ -7,6 +7,7 @@ libdecoration_includes = [
 
 libdecoration_sources = [
   'libdecoration.c',
+  'libdecoration-fallback.c',
 ]
 
 libdecoration_built_sources = []
@@ -58,6 +59,7 @@ libdecoration = shared_library('decoration',
   c_args: libdecoration_c_args,
   dependencies: [
     wayland_client_dep,
+    dl_dep,
   ],
   install: true
 )

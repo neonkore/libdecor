@@ -26,11 +26,16 @@
 
 #include "config.h"
 
+#include <errno.h>
+#include <dirent.h>
+#include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 
 #include "libdecoration.h"
+#include "libdecoration-fallback.h"
+#include "libdecoration-plugin.h"
 #include "utils.h"
 
 #include "xdg-shell-client-protocol.h"
@@ -39,6 +44,9 @@ struct libdecor {
 	int ref_count;
 
 	struct libdecor_interface *iface;
+
+	struct libdecor_plugin *plugin;
+	bool plugin_ready;
 
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
@@ -84,11 +92,7 @@ struct libdecor_frame_private {
 	bool pending_map;
 
 	struct libdecor_configuration *pending_configuration;
-};
 
-struct libdecor_frame {
-	struct libdecor_frame_private *priv;
-	struct wl_list link;
 };
 
 static void
@@ -294,7 +298,6 @@ libdecor_decorate(struct libdecor *context,
 		  struct libdecor_frame_interface *iface,
 		  void *user_data)
 {
-	struct libdecor_plugin *plugin = context->plugin;
 	struct libdecor_frame *frame;
 	struct libdecor_frame_private *frame_priv;
 
@@ -512,10 +515,26 @@ is_compositor_compatible(struct libdecor *context)
 	if (!context->xdg_wm_base)
 		return false;
 
-	if (!context->wl_subcompositor)
-		return false;
-
 	return true;
+}
+
+static void
+notify_error(struct libdecor *context,
+	     enum libdecor_error error,
+	     const char *message)
+{
+	context->has_error = true;
+	context->iface->error(context, error, message);
+	context->plugin->iface->destroy(context->plugin);
+}
+
+static void
+finish_init(struct libdecor *context)
+{
+	struct libdecor_frame *frame;
+
+	wl_list_for_each(frame, &context->frames, link)
+		init_shell_surface(frame);
 }
 
 static void
@@ -524,25 +543,131 @@ init_wl_display_callback(void *user_data,
 			 uint32_t time)
 {
 	struct libdecor *context = user_data;
-	struct libdecor_frame *frame;
 
 	context->init_done = true;
 	context->init_callback = NULL;
 
 	if (!is_compositor_compatible(context)) {
-		context->has_error = true;
-		context->iface->error(context,
-				      LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-				      "Compositor is missing required interfaces");
+		notify_error(context,
+			     LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+			     "Compositor is missing required interfaces");
 	}
 
-	wl_list_for_each(frame, &context->frames, link)
-		init_shell_surface(frame);
+	if (context->plugin_ready) {
+		finish_init(context);
+	}
 }
 
 static const struct wl_callback_listener init_wl_display_callback_listener = {
 	init_wl_display_callback
 };
+
+static struct libdecor_plugin *
+load_plugin(struct libdecor *context,
+	    const char *path,
+	    const char *name)
+{
+	char *filename;
+	void *lib;
+	libdecor_plugin_constructor libdecor_plugin_constructor;
+	struct libdecor_plugin *plugin;
+
+	if (asprintf(&filename, "%s/%s", path, name) == -1)
+		return NULL;
+
+	lib = dlopen(filename, RTLD_NOW | RTLD_LAZY);
+	free(filename);
+	if (!lib) {
+		return NULL;
+	}
+
+	libdecor_plugin_constructor = dlsym(lib, "libdecor_plugin_new");
+	if (!libdecor_plugin_constructor) {
+		dlclose(lib);
+		fprintf(stderr,
+			"Failed to load plugin '%s': no constructor symbol\n",
+			name);
+		return NULL;
+	}
+
+	plugin = libdecor_plugin_constructor(context);
+	if (!plugin) {
+		dlclose(lib);
+		fprintf(stderr,
+			"Failed to load plugin '%s': failod to init\n",
+			name);
+		return NULL;
+	}
+
+	return plugin;
+}
+
+static int
+init_plugins(struct libdecor *context)
+{
+	const char *plugin_dir;
+	DIR *dir;
+
+	plugin_dir = getenv("LIBDECOR_PLUGIN_DIR");
+	if (!plugin_dir)
+		plugin_dir = LIBDECOR_PLUGIN_DIR;
+
+	dir = opendir(plugin_dir);
+	if (!dir) {
+		fprintf(stderr, "Couldn't open plugin directory: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	while (true) {
+		struct dirent *de;
+		struct libdecor_plugin *plugin;
+
+		de = readdir(dir);
+		if (!de)
+			break;
+
+		plugin = load_plugin(context, plugin_dir, de->d_name);
+		if (plugin) {
+			fprintf(stderr, "Loaded plugin '%s'\n", de->d_name);
+			context->plugin = plugin;
+			break;
+		}
+	}
+
+	closedir(dir);
+
+	if (!context->plugin)
+		return -1;
+
+	return 0;
+}
+
+LIBDECOR_EXPORT struct wl_display *
+libdecor_get_wl_display(struct libdecor *context)
+{
+	return context->wl_display;
+}
+
+LIBDECOR_EXPORT void
+libdecor_notify_plugin_ready(struct libdecor *context)
+{
+	context->plugin_ready = true;
+
+	if (context->init_done)
+		finish_init(context);
+}
+
+LIBDECOR_EXPORT void
+libdecor_notify_plugin_error(struct libdecor *context,
+			     enum libdecor_error error,
+			     const char *message)
+{
+	if (context->has_error)
+		return;
+
+	notify_error(context, error, message);
+}
 
 LIBDECOR_EXPORT void
 libdecor_unref(struct libdecor *context)
@@ -577,6 +702,12 @@ libdecor_new(struct wl_display *wl_display,
 				 context);
 
 	wl_list_init(&context->frames);
+
+	if (init_plugins(context) != 0) {
+		fprintf(stderr,
+			"No plugins found, falling back on no decorations\n");
+		context->plugin = libdecor_fallback_plugin_new(context);
+	}
 
 	wl_display_flush(wl_display);
 
