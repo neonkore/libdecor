@@ -29,6 +29,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/input.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +59,8 @@ struct window {
 
 static struct wl_compositor *wl_compositor;
 static struct wl_shm *wl_shm;
+static struct wl_seat *wl_seat;
+static struct wl_pointer *wl_pointer;
 
 static bool has_xrgb = false;
 
@@ -74,6 +77,93 @@ shm_format(void *data,
 
 struct wl_shm_listener shm_listener = {
 	shm_format
+};
+
+static void
+pointer_enter(void *data,
+	      struct wl_pointer *wl_pointer,
+	      uint32_t serial,
+	      struct wl_surface *surface,
+	      wl_fixed_t surface_x,
+	      wl_fixed_t surface_y)
+{
+}
+
+static void
+pointer_leave(void *data,
+	      struct wl_pointer *wl_pointer,
+	      uint32_t serial,
+	      struct wl_surface *surface)
+{
+}
+
+static void
+pointer_motion(void *data,
+	       struct wl_pointer *wl_pointer,
+	       uint32_t time,
+	       wl_fixed_t surface_x,
+	       wl_fixed_t surface_y)
+{
+}
+
+static void
+pointer_button(void *data,
+	       struct wl_pointer *wl_pointer,
+	       uint32_t serial,
+	       uint32_t time,
+	       uint32_t button,
+	       uint32_t state)
+{
+	if (button == BTN_LEFT && state) {
+		libdecor_frame_request_interactive_move(window->frame,
+							wl_seat,
+							serial);
+	}
+}
+
+static void
+pointer_axis(void *data,
+	     struct wl_pointer *wl_pointer,
+	     uint32_t time,
+	     uint32_t axis,
+	     wl_fixed_t value)
+{
+}
+
+static struct wl_pointer_listener pointer_listener = {
+	pointer_enter,
+	pointer_leave,
+	pointer_motion,
+	pointer_button,
+	pointer_axis
+};
+
+static void
+seat_capabilities(void *data,
+		  struct wl_seat *wl_seat,
+		  uint32_t capabilities)
+{
+	if (capabilities & WL_SEAT_CAPABILITY_POINTER &&
+	    !wl_pointer) {
+		wl_pointer = wl_seat_get_pointer(wl_seat);
+		wl_pointer_add_listener(wl_pointer, &pointer_listener, NULL);
+	} else if (!(capabilities & WL_SEAT_CAPABILITY_POINTER) &&
+		   wl_pointer) {
+		wl_pointer_release(wl_pointer);
+		wl_pointer = NULL;
+	}
+}
+
+static void
+seat_name(void *data,
+	  struct wl_seat *wl_seat,
+	  const char *name)
+{
+}
+
+static struct wl_seat_listener seat_listener = {
+	seat_capabilities,
+	seat_name
 };
 
 static void
@@ -95,6 +185,10 @@ registry_handle_global(void *user_data,
 		wl_shm = wl_registry_bind(wl_registry,
 					  id, &wl_shm_interface, 1);
 		wl_shm_add_listener(wl_shm, &shm_listener, NULL);
+	} else if (strcmp(interface, "wl_seat") == 0) {
+		wl_seat = wl_registry_bind(wl_registry,
+					   id, &wl_seat_interface, 1);
+		wl_seat_add_listener(wl_seat, &seat_listener, NULL);
 	}
 }
 
