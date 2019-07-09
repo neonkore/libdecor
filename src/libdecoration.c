@@ -146,18 +146,26 @@ libdecor_configuration_free(struct libdecor_configuration *configuration)
 	free(configuration);
 }
 
-static void
-window_size_to_content_size(int window_width,
-			    int window_height,
+static bool
+window_size_to_content_size(struct libdecor_configuration *configuration,
+			    struct libdecor_frame *frame,
 			    int *content_width,
 			    int *content_height)
 {
-	*content_width = window_width;
-	*content_height = window_height;
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	return plugin->iface->configuration_get_content_size(plugin,
+							     configuration,
+							     frame,
+							     content_width,
+							     content_height);
 }
 
 LIBDECOR_EXPORT bool
 libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,
+					struct libdecor_frame *frame,
 					int *width,
 					int *height)
 {
@@ -170,12 +178,30 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 	if (configuration->window_width == 0 || configuration->window_height == 0)
 		return false;
 
-	window_size_to_content_size(configuration->window_width,
-				    configuration->window_height,
-				    &content_width,
-				    &content_height);
+	if (!window_size_to_content_size(configuration,
+					 frame,
+					 &content_width,
+					 &content_height))
+		return false;
+
 	*width = content_width;
 	*height = content_height;
+	return true;
+}
+
+LIBDECOR_EXPORT bool
+libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
+				       int *width,
+				       int *height)
+{
+	if (!configuration->has_size)
+		return false;
+
+	if (configuration->window_width == 0 || configuration->window_height == 0)
+		return false;
+
+	*width = configuration->window_width;
+	*height = configuration->window_height;
 	return true;
 }
 

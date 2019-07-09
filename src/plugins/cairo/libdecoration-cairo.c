@@ -570,12 +570,26 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 	set_window_geometry(frame_cairo);
 }
 
+static bool
+libdecor_plugin_cairo_configuration_get_content_size(struct libdecor_plugin *plugin,
+						     struct libdecor_configuration *configuration,
+						     struct libdecor_frame *frame,
+						     int *content_width,
+						     int *content_height)
+{
+	return libdecor_configuration_get_window_size(configuration,
+						      content_width,
+						      content_height);
+}
+
 static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.destroy = libdecor_plugin_cairo_destroy,
 
 	.frame_new = libdecor_plugin_cairo_frame_new,
 	.frame_free = libdecor_plugin_cairo_frame_free,
 	.frame_commit = libdecor_plugin_cairo_frame_commit,
+
+	.configuration_get_content_size = libdecor_plugin_cairo_configuration_get_content_size,
 };
 
 static void

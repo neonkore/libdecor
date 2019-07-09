@@ -55,6 +55,12 @@ struct libdecor_plugin_interface {
 			      struct libdecor_frame *frame,
 			      struct libdecor_state *state,
 			      struct libdecor_configuration *configuration);
+
+	bool (* configuration_get_content_size)(struct libdecor_plugin *plugin,
+						struct libdecor_configuration *configuration,
+						struct libdecor_frame *frame,
+						int *content_width,
+						int *content_height);
 };
 
 struct wl_surface *

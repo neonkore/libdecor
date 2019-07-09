@@ -61,6 +61,8 @@ static struct wl_shm *wl_shm;
 
 static bool has_xrgb = false;
 
+static struct window *window;
+
 static void
 shm_format(void *data,
 	   struct wl_shm *wl_shm,
@@ -261,7 +263,8 @@ handle_configure(struct libdecor_frame *frame,
 	enum libdecor_window_state window_state;
 	struct libdecor_state *state;
 
-	if (!libdecor_configuration_get_content_size(configuration, &width, &height)) {
+	if (!libdecor_configuration_get_content_size(configuration, frame,
+						     &width, &height)) {
 		width = window->content_width;
 		height = window->content_height;
 	}
@@ -304,7 +307,6 @@ main(int argc,
 {
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
-	struct window *window;
 	struct libdecor *context;
 	int ret = 0;
 
