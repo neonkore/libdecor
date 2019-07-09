@@ -75,7 +75,7 @@ shm_format(void *data,
 		has_xrgb = true;
 }
 
-struct wl_shm_listener shm_listener = {
+static struct wl_shm_listener shm_listener = {
 	shm_format
 };
 
