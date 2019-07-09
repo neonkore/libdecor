@@ -25,12 +25,14 @@
 
 #include "config.h"
 
+#include <linux/input.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <wayland-cursor.h>
 
 #include "libdecoration-cairo.h"
 #include "libdecoration-plugin.h"
@@ -51,6 +53,17 @@ enum border_side {
 	BORDER_SIDE_RIGHT,
 	BORDER_SIDE_BOTTOM,
 	BORDER_SIDE_LEFT,
+};
+
+struct seat {
+	struct libdecor_plugin_cairo *plugin_cairo;
+
+	struct wl_seat *wl_seat;
+	struct wl_pointer *wl_pointer;
+
+	struct wl_surface *cursor_surface;
+
+	struct wl_surface *pointer_focus;
 };
 
 struct buffer {
@@ -104,6 +117,15 @@ struct libdecor_plugin_cairo {
 	struct wl_shm *wl_shm;
 	struct wl_callback *shm_callback;
 	bool has_argb;
+
+	struct wl_cursor_theme *cursor_theme;
+
+	struct {
+		struct wl_cursor *top_side;
+		struct wl_cursor *right_side;
+		struct wl_cursor *bottom_side;
+		struct wl_cursor *left_side;
+	} cursors;
 };
 
 struct libdecor_plugin *
@@ -359,6 +381,11 @@ ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 				       parent,
 				       &frame_cairo->border.left.wl_surface,
 				       &frame_cairo->border.left.wl_subsurface);
+
+	wl_surface_set_user_data(frame_cairo->border.top.wl_surface, frame_cairo);
+	wl_surface_set_user_data(frame_cairo->border.right.wl_surface, frame_cairo);
+	wl_surface_set_user_data(frame_cairo->border.bottom.wl_surface, frame_cairo);
+	wl_surface_set_user_data(frame_cairo->border.left.wl_surface, frame_cairo);
 }
 
 static void
@@ -670,6 +697,206 @@ init_wl_shm(struct libdecor_plugin_cairo *plugin_cairo,
 }
 
 static void
+ensure_cursor_surface(struct seat *seat)
+{
+	struct wl_compositor *wl_compositor = seat->plugin_cairo->wl_compositor;
+
+	if (seat->cursor_surface)
+		return;
+
+	seat->cursor_surface = wl_compositor_create_surface(wl_compositor);
+}
+
+static void
+ensure_cursor_theme(struct libdecor_plugin_cairo *plugin_cairo)
+{
+	plugin_cairo->cursor_theme =
+		wl_cursor_theme_load(NULL, 24, plugin_cairo->wl_shm);
+
+	plugin_cairo->cursors.top_side =
+		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
+					   "top_side");
+	plugin_cairo->cursors.right_side =
+		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
+					   "right_side");
+	plugin_cairo->cursors.bottom_side =
+		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
+					   "bottom_side");
+	plugin_cairo->cursors.left_side =
+		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
+					   "left_side");
+}
+
+static void
+pointer_enter(void *data,
+	      struct wl_pointer *wl_pointer,
+	      uint32_t serial,
+	      struct wl_surface *surface,
+	      wl_fixed_t surface_x,
+	      wl_fixed_t surface_y)
+{
+	struct seat *seat = data;
+	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
+	struct libdecor_frame_cairo *frame_cairo;
+	struct wl_cursor *wl_cursor;
+	struct wl_cursor_image *image;
+	struct wl_buffer *buffer;
+
+	ensure_cursor_surface(seat);
+	ensure_cursor_theme(plugin_cairo);
+
+	seat->pointer_focus = surface;
+
+	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
+	if (!frame_cairo)
+		return;
+
+	if (seat->pointer_focus == frame_cairo->border.top.wl_surface)
+		wl_cursor = plugin_cairo->cursors.top_side;
+	else if (seat->pointer_focus == frame_cairo->border.right.wl_surface)
+		wl_cursor = plugin_cairo->cursors.right_side;
+	else if (seat->pointer_focus == frame_cairo->border.bottom.wl_surface)
+		wl_cursor = plugin_cairo->cursors.bottom_side;
+	else if (seat->pointer_focus == frame_cairo->border.left.wl_surface)
+		wl_cursor = plugin_cairo->cursors.left_side;
+	else
+		return;
+
+	image = wl_cursor->images[0];
+	buffer = wl_cursor_image_get_buffer(image);
+	wl_pointer_set_cursor(wl_pointer, serial,
+			      seat->cursor_surface,
+			      image->hotspot_x,
+			      image->hotspot_y);
+	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
+	wl_surface_damage(seat->cursor_surface, 0, 0,
+			  image->width, image->height);
+	wl_surface_commit(seat->cursor_surface);
+}
+
+static void
+pointer_leave(void *data,
+	      struct wl_pointer *wl_pointer,
+	      uint32_t serial,
+	      struct wl_surface *surface)
+{
+	struct seat *seat = data;
+
+	seat->pointer_focus = NULL;
+}
+
+static void
+pointer_motion(void *data,
+	       struct wl_pointer *wl_pointer,
+	       uint32_t time,
+	       wl_fixed_t surface_x,
+	       wl_fixed_t surface_y)
+{
+}
+
+static void
+pointer_button(void *data,
+	       struct wl_pointer *wl_pointer,
+	       uint32_t serial,
+	       uint32_t time,
+	       uint32_t button,
+	       uint32_t state)
+{
+	struct seat *seat = data;
+	struct libdecor_frame_cairo *frame_cairo;
+
+	if (!seat->pointer_focus)
+		return;
+
+	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
+	if (!frame_cairo)
+		return;
+
+	if (button == BTN_LEFT && state) {
+		enum libdecor_resize_edge edge;
+
+		if (seat->pointer_focus == frame_cairo->border.top.wl_surface)
+			edge = LIBDECOR_RESIZE_EDGE_TOP;
+		else if (seat->pointer_focus == frame_cairo->border.right.wl_surface)
+			edge = LIBDECOR_RESIZE_EDGE_RIGHT;
+		else if (seat->pointer_focus == frame_cairo->border.bottom.wl_surface)
+			edge = LIBDECOR_RESIZE_EDGE_BOTTOM;
+		else if (seat->pointer_focus == frame_cairo->border.left.wl_surface)
+			edge = LIBDECOR_RESIZE_EDGE_LEFT;
+		else
+			return;
+
+		libdecor_frame_request_interactive_resize(&frame_cairo->frame,
+							  seat->wl_seat,
+							  serial,
+							  edge);
+	}
+}
+
+static void
+pointer_axis(void *data,
+	     struct wl_pointer *wl_pointer,
+	     uint32_t time,
+	     uint32_t axis,
+	     wl_fixed_t value)
+{
+}
+
+static struct wl_pointer_listener pointer_listener = {
+	pointer_enter,
+	pointer_leave,
+	pointer_motion,
+	pointer_button,
+	pointer_axis
+};
+
+static void
+seat_capabilities(void *data,
+		  struct wl_seat *wl_seat,
+		  uint32_t capabilities)
+{
+	struct seat *seat = data;
+
+	if ((capabilities & WL_SEAT_CAPABILITY_POINTER) &&
+	    !seat->wl_pointer) {
+		seat->wl_pointer = wl_seat_get_pointer(wl_seat);
+		wl_pointer_add_listener(seat->wl_pointer,
+					&pointer_listener, seat);
+	} else if (!(capabilities & WL_SEAT_CAPABILITY_POINTER) &&
+		   seat->wl_pointer) {
+		wl_pointer_release(seat->wl_pointer);
+		seat->wl_pointer = NULL;
+	}
+}
+
+static void
+seat_name(void *data,
+	  struct wl_seat *wl_seat,
+	  const char *name)
+{
+}
+
+static struct wl_seat_listener seat_listener = {
+	seat_capabilities,
+	seat_name
+};
+
+static void
+init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
+	     uint32_t id,
+	     uint32_t version)
+{
+	struct seat *seat;
+
+	seat = zalloc(sizeof *seat);
+	seat->plugin_cairo = plugin_cairo;
+	seat->wl_seat =
+		wl_registry_bind(plugin_cairo->wl_registry,
+				 id, &wl_seat_interface, 1);
+	wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
+}
+
+static void
 registry_handle_global(void *user_data,
 		       struct wl_registry *wl_registry,
 		       uint32_t id,
@@ -684,6 +911,8 @@ registry_handle_global(void *user_data,
 		init_wl_subcompositor(plugin_cairo, id, version);
 	else if (strcmp(interface, "wl_shm") == 0)
 		init_wl_shm(plugin_cairo, id, version);
+	else if (strcmp(interface, "wl_seat") == 0)
+		init_wl_seat(plugin_cairo, id, version);
 }
 
 static void

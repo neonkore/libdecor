@@ -1,4 +1,5 @@
 cairo_dep = dependency('cairo')
+wayland_cursor_dep = dependency('wayland-cursor')
 
 shared_module('decoration-cairo',
   sources: [
@@ -13,6 +14,7 @@ shared_module('decoration-cairo',
   dependencies: [
     libdecoration_dep,
     cairo_dep,
+    wayland_cursor_dep,
   ],
   install_dir: join_paths(plugindir, 'cairo'),
   install: true,

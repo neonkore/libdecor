@@ -35,6 +35,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <wayland-cursor.h>
 
 #include "libdecoration.h"
 #include "utils.h"
@@ -61,6 +62,9 @@ static struct wl_compositor *wl_compositor;
 static struct wl_shm *wl_shm;
 static struct wl_seat *wl_seat;
 static struct wl_pointer *wl_pointer;
+static struct wl_cursor_theme *cursor_theme;
+static struct wl_cursor *left_ptr_cursor;
+static struct wl_surface *cursor_surface;
 
 static bool has_xrgb = false;
 
@@ -87,6 +91,25 @@ pointer_enter(void *data,
 	      wl_fixed_t surface_x,
 	      wl_fixed_t surface_y)
 {
+	struct wl_cursor *wl_cursor;
+	struct wl_cursor_image *image;
+	struct wl_buffer *buffer;
+
+	if (surface != window->wl_surface)
+		return;
+
+	wl_cursor = left_ptr_cursor;
+
+	image = wl_cursor->images[0];
+	buffer = wl_cursor_image_get_buffer(image);
+	wl_pointer_set_cursor(wl_pointer, serial,
+			      cursor_surface,
+			      image->hotspot_x,
+			      image->hotspot_y);
+	wl_surface_attach(cursor_surface, buffer, 0, 0);
+	wl_surface_damage(cursor_surface, 0, 0,
+			  image->width, image->height);
+	wl_surface_commit(cursor_surface);
 }
 
 static void
@@ -395,6 +418,14 @@ static struct libdecor_frame_interface libdecor_frame_iface = {
 	handle_close,
 };
 
+static void
+init_cursors(void)
+{
+	cursor_theme = wl_cursor_theme_load(NULL, 24, wl_shm);
+	left_ptr_cursor = wl_cursor_theme_get_cursor(cursor_theme, "left_ptr");
+	cursor_surface = wl_compositor_create_surface(wl_compositor);
+}
+
 int
 main(int argc,
      char **argv)
@@ -415,6 +446,8 @@ main(int argc,
 		fprintf(stderr, "No XRGB shm format\n");
 		return EXIT_FAILURE;
 	}
+
+	init_cursors();
 
 	window = zalloc(sizeof *window);
 	window->wl_surface = wl_compositor_create_surface(wl_compositor);
