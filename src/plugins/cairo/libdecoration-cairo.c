@@ -335,17 +335,22 @@ hide_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 }
 
 static void
-create_surface_subsurface_pair(struct libdecor_plugin_cairo *plugin_cairo,
-			       struct wl_surface *parent,
+create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 			       struct wl_surface **out_wl_surface,
 			       struct wl_subsurface **out_wl_subsurface)
 {
+	struct libdecor_plugin_cairo *plugin_cairo = frame_cairo->plugin_cairo;
+	struct libdecor_frame *frame = &frame_cairo->frame;
 	struct wl_compositor *wl_compositor = plugin_cairo->wl_compositor;
 	struct wl_subcompositor *wl_subcompositor = plugin_cairo->wl_subcompositor;
 	struct wl_surface *wl_surface;
+	struct wl_surface *parent;
 	struct wl_subsurface *wl_subsurface;
 
 	wl_surface = wl_compositor_create_surface(wl_compositor);
+	wl_surface_set_user_data(wl_surface, frame_cairo);
+
+	parent = libdecor_frame_get_wl_surface(frame);
 	wl_subsurface = wl_subcompositor_get_subsurface(wl_subcompositor,
 							wl_surface,
 							parent);
@@ -357,34 +362,21 @@ create_surface_subsurface_pair(struct libdecor_plugin_cairo *plugin_cairo,
 static void
 ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
-	struct libdecor_plugin_cairo *plugin_cairo = frame_cairo->plugin_cairo;
-	struct libdecor_frame *frame = &frame_cairo->frame;
-	struct wl_surface *parent = libdecor_frame_get_wl_surface(frame);
-
 	if (frame_cairo->border.top.wl_surface)
 		return;
 
-	create_surface_subsurface_pair(plugin_cairo,
-				       parent,
+	create_surface_subsurface_pair(frame_cairo,
 				       &frame_cairo->border.top.wl_surface,
 				       &frame_cairo->border.top.wl_subsurface);
-	create_surface_subsurface_pair(plugin_cairo,
-				       parent,
+	create_surface_subsurface_pair(frame_cairo,
 				       &frame_cairo->border.right.wl_surface,
 				       &frame_cairo->border.right.wl_subsurface);
-	create_surface_subsurface_pair(plugin_cairo,
-				       parent,
+	create_surface_subsurface_pair(frame_cairo,
 				       &frame_cairo->border.bottom.wl_surface,
 				       &frame_cairo->border.bottom.wl_subsurface);
-	create_surface_subsurface_pair(plugin_cairo,
-				       parent,
+	create_surface_subsurface_pair(frame_cairo,
 				       &frame_cairo->border.left.wl_surface,
 				       &frame_cairo->border.left.wl_subsurface);
-
-	wl_surface_set_user_data(frame_cairo->border.top.wl_surface, frame_cairo);
-	wl_surface_set_user_data(frame_cairo->border.right.wl_surface, frame_cairo);
-	wl_surface_set_user_data(frame_cairo->border.bottom.wl_surface, frame_cairo);
-	wl_surface_set_user_data(frame_cairo->border.left.wl_surface, frame_cairo);
 }
 
 static void
