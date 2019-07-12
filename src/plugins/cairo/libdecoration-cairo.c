@@ -34,7 +34,6 @@
 #include <errno.h>
 #include <wayland-cursor.h>
 
-#include "libdecoration-cairo.h"
 #include "libdecoration-plugin.h"
 #include "utils.h"
 
