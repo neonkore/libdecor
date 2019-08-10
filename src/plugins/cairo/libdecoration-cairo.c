@@ -39,19 +39,64 @@
 
 #include "xdg-shell-client-protocol.h"
 
-#define BORDER_MARGIN 24
-#define BORDER_RADIUS 3
+#include <cairo/cairo.h>
+
+static const size_t SHADOW_MARGIN = 24;	/* graspable part of the border */
+static const size_t TITLE_HEIGHT = 24;
+static const size_t BUTTON_WIDTH = 32;
+static const size_t SYM_DIM = 14;
+
+static const uint32_t COL_SHADOW = 0x80303030;
+static const uint32_t COL_TITLE = 0xFF080706;
+static const uint32_t COL_BUTTON_MIN = 0xFFFFBB00;
+static const uint32_t COL_BUTTON_MAX = 0xFF238823;
+static const uint32_t COL_BUTTON_CLOSE = 0xFFFB6542;
+static const uint32_t COL_SYM = 0xFFF4F4EF;
+static const uint32_t COL_SYM_ACT = 0xFF20322A;
+
+static const uint32_t DOUBLE_CLICK_TIME_MS = 400;
+
+
+/* color conversion function from 32bit integer to double components */
+
+double
+red(const uint32_t *const col) {
+	return ((const uint8_t*)(col))[2] / (double)(255);
+}
+
+double
+green(const uint32_t *const col) {
+	return ((const uint8_t*)(col))[1] / (double)(255);
+}
+
+double
+blue(const uint32_t *const col) {
+	return ((const uint8_t*)(col))[0] / (double)(255);
+}
+
+double
+alpha(const uint32_t *const col) {
+	return ((const uint8_t*)(col))[3] / (double)(255);
+}
+
+void
+cairo_set_rgba32(cairo_t *cr, const uint32_t *const c) {
+	cairo_set_source_rgba(cr, red(c), green(c), blue(c), alpha(c));
+}
 
 enum decoration_type {
 	DECORATION_TYPE_NONE,
-	DECORATION_TYPE_SHADOW,
+	DECORATION_TYPE_ALL,
+	DECORATION_TYPE_TITLE_ONLY
 };
 
-enum border_side {
-	BORDER_SIDE_TOP,
-	BORDER_SIDE_RIGHT,
-	BORDER_SIDE_BOTTOM,
-	BORDER_SIDE_LEFT,
+enum component {
+	NONE = 0,
+	SHADOW,
+	TITLE,
+	BUTTON_MIN,
+	BUTTON_MAX,
+	BUTTON_CLOSE,
 };
 
 struct seat {
@@ -63,6 +108,12 @@ struct seat {
 	struct wl_surface *cursor_surface;
 
 	struct wl_surface *pointer_focus;
+
+	int pointer_x, pointer_y;
+
+	uint32_t pointer_button_time_stamp;
+
+	uint32_t serial;
 };
 
 struct buffer {
@@ -77,6 +128,7 @@ struct buffer {
 };
 
 struct border_component {
+	enum component type;
 	struct wl_surface *wl_surface;
 	struct wl_subsurface *wl_subsurface;
 	struct buffer *buffer;
@@ -92,14 +144,18 @@ struct libdecor_frame_cairo {
 
 	enum decoration_type decoration_type;
 
+	struct border_component *active;
+
+	bool shadow_showing;
+	struct border_component shadow;
+
 	struct {
 		bool is_showing;
-
-		struct border_component top;
-		struct border_component right;
-		struct border_component bottom;
-		struct border_component left;
-	} border;
+		struct border_component title;
+		struct border_component min;
+		struct border_component max;
+		struct border_component close;
+	} title_bar;
 };
 
 struct libdecor_plugin_cairo {
@@ -119,15 +175,30 @@ struct libdecor_plugin_cairo {
 
 	struct wl_cursor_theme *cursor_theme;
 
-	struct {
-		struct wl_cursor *top_side;
-		struct wl_cursor *right_side;
-		struct wl_cursor *bottom_side;
-		struct wl_cursor *left_side;
-	} cursors;
+	struct wl_cursor *cursors[8]; /* resize edges and corners */
+
+	struct wl_cursor *cursor_left_ptr;
+};
+
+static const char* cursor_names[] = {
+	"top_side",
+	"bottom_side",
+	"left_side",
+	"top_left_corner",
+	"bottom_left_corner",
+	"right_side",
+	"top_right_corner",
+	"bottom_right_corner"
 };
 
 static const char *libdecoration_cairo_proxy_tag = "libdecoration-cairo";
+
+static bool
+own_surface(struct wl_surface *surface)
+{
+	return (wl_proxy_get_tag((struct wl_proxy *) surface) ==
+		&libdecoration_cairo_proxy_tag);
+}
 
 struct libdecor_plugin *
 libdecor_plugin_new(struct libdecor *context);
@@ -185,6 +256,16 @@ create_anonymous_file(off_t size)
 	}
 
 	return fd;
+}
+
+static void
+toggle_maximized(struct libdecor_frame *const frame)
+{
+	if (!(libdecor_frame_get_window_state(frame) &
+	      LIBDECOR_WINDOW_STATE_MAXIMIZED))
+		libdecor_frame_set_maximized(frame);
+	else
+		libdecor_frame_unset_maximized(frame);
 }
 
 static void
@@ -280,16 +361,19 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	struct libdecor_frame_cairo *frame_cairo =
 		(struct libdecor_frame_cairo *) frame;
 
-	free_border_component(&frame_cairo->border.top);
-	free_border_component(&frame_cairo->border.right);
-	free_border_component(&frame_cairo->border.bottom);
-	free_border_component(&frame_cairo->border.left);
+	free_border_component(&frame_cairo->shadow);
 }
 
 static bool
 is_border_surfaces_showing(struct libdecor_frame_cairo *frame_cairo)
 {
-	return frame_cairo->border.is_showing;
+	return frame_cairo->shadow_showing;
+}
+
+static bool
+is_title_bar_surfaces_showing(struct libdecor_frame_cairo *frame_cairo)
+{
+	return frame_cairo->title_bar.is_showing;
 }
 
 static void
@@ -302,11 +386,18 @@ hide_border_component(struct border_component *border_component)
 static void
 hide_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
-	hide_border_component(&frame_cairo->border.top);
-	hide_border_component(&frame_cairo->border.right);
-	hide_border_component(&frame_cairo->border.bottom);
-	hide_border_component(&frame_cairo->border.left);
-	frame_cairo->border.is_showing = false;
+	hide_border_component(&frame_cairo->shadow);
+	frame_cairo->shadow_showing = false;
+}
+
+static void
+hide_title_bar_surfaces(struct libdecor_frame_cairo *frame_cairo)
+{
+	hide_border_component(&frame_cairo->title_bar.title);
+	hide_border_component(&frame_cairo->title_bar.min);
+	hide_border_component(&frame_cairo->title_bar.max);
+	hide_border_component(&frame_cairo->title_bar.close);
+	frame_cairo->title_bar.is_showing = false;
 }
 
 static void
@@ -337,28 +428,46 @@ create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 }
 
 static void
+ensure_component(struct libdecor_frame_cairo *frame_cairo,
+		 struct border_component *cmpnt)
+{
+	if (!cmpnt->wl_surface) {
+		create_surface_subsurface_pair(frame_cairo,
+					       &cmpnt->wl_surface,
+					       &cmpnt->wl_subsurface);
+		wl_surface_set_user_data(cmpnt->wl_surface, frame_cairo);
+	}
+}
+
+static void
 ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
-	if (frame_cairo->border.top.wl_surface)
-		return;
+	if (frame_cairo->shadow.type == NONE) {
+		frame_cairo->shadow.type = SHADOW;
+		ensure_component(frame_cairo, &frame_cairo->shadow);
+	}
 
-	create_surface_subsurface_pair(frame_cairo,
-				       &frame_cairo->border.top.wl_surface,
-				       &frame_cairo->border.top.wl_subsurface);
-	create_surface_subsurface_pair(frame_cairo,
-				       &frame_cairo->border.right.wl_surface,
-				       &frame_cairo->border.right.wl_subsurface);
-	create_surface_subsurface_pair(frame_cairo,
-				       &frame_cairo->border.bottom.wl_surface,
-				       &frame_cairo->border.bottom.wl_subsurface);
-	create_surface_subsurface_pair(frame_cairo,
-				       &frame_cairo->border.left.wl_surface,
-				       &frame_cairo->border.left.wl_subsurface);
+	libdecor_frame_set_min_content_size(&frame_cairo->frame,
+					    4 * BUTTON_WIDTH,
+					    TITLE_HEIGHT + 1);
+}
+
+static void
+ensure_title_bar_surfaces(struct libdecor_frame_cairo *frame_cairo)
+{
+	ensure_component(frame_cairo, &frame_cairo->title_bar.title);
+	frame_cairo->title_bar.title.type = TITLE;
+	ensure_component(frame_cairo, &frame_cairo->title_bar.min);
+	frame_cairo->title_bar.min.type = BUTTON_MIN;
+	ensure_component(frame_cairo, &frame_cairo->title_bar.max);
+	frame_cairo->title_bar.max.type = BUTTON_MAX;
+	ensure_component(frame_cairo, &frame_cairo->title_bar.close);
+	frame_cairo->title_bar.close.type = BUTTON_CLOSE;
 }
 
 static void
 calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
-			 enum border_side border_side,
+			 enum component component,
 			 int *component_x,
 			 int *component_y,
 			 int *component_width,
@@ -370,30 +479,40 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
 	content_width = libdecor_frame_get_content_width(frame);
 	content_height = libdecor_frame_get_content_height(frame);
 
-	switch (border_side) {
-	case BORDER_SIDE_TOP:
-		*component_x = -BORDER_MARGIN;
-		*component_y = -BORDER_MARGIN;
-		*component_width = content_width + (2 * BORDER_MARGIN);
-		*component_height = BORDER_MARGIN;
+	switch (component) {
+	case NONE:
 		return;
-	case BORDER_SIDE_RIGHT:
-		*component_x = content_width;
-		*component_y = 0;
-		*component_width = BORDER_MARGIN;
-		*component_height = content_height;
+	case SHADOW:
+		*component_x = -(int)SHADOW_MARGIN;
+		*component_y = -(int)(SHADOW_MARGIN+TITLE_HEIGHT);
+		*component_width = content_width + 2 * SHADOW_MARGIN;
+		*component_height = content_height
+				    + 2 * SHADOW_MARGIN
+				    + TITLE_HEIGHT;
 		return;
-	case BORDER_SIDE_BOTTOM:
-		*component_x = -BORDER_MARGIN;
-		*component_y = content_height;
-		*component_width = content_width + (2 * BORDER_MARGIN);
-		*component_height = BORDER_MARGIN;
+	case TITLE:
+		*component_x = 0;
+		*component_y = -(int)TITLE_HEIGHT;
+		*component_width = content_width;
+		*component_height = TITLE_HEIGHT;
 		return;
-	case BORDER_SIDE_LEFT:
-		*component_x = -BORDER_MARGIN;
-		*component_y = 0;
-		*component_width = BORDER_MARGIN;
-		*component_height = content_height;
+	case BUTTON_MIN:
+		*component_x = content_width - 3 * BUTTON_WIDTH;
+		*component_y = -(int)TITLE_HEIGHT;
+		*component_width = BUTTON_WIDTH;
+		*component_height = TITLE_HEIGHT;
+		return;
+	case BUTTON_MAX:
+		*component_x = content_width - 2 * BUTTON_WIDTH;
+		*component_y = -(int)TITLE_HEIGHT;
+		*component_width = BUTTON_WIDTH;
+		*component_height = TITLE_HEIGHT;
+		return;
+	case BUTTON_CLOSE:
+		*component_x = content_width - BUTTON_WIDTH;
+		*component_y = -(int)TITLE_HEIGHT;
+		*component_width = BUTTON_WIDTH;
+		*component_height = TITLE_HEIGHT;
 		return;
 	}
 
@@ -401,22 +520,204 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
 }
 
 static void
-draw_shadow_content(struct libdecor_plugin_cairo *plugin_cairo,
-		    struct buffer *buffer,
-		    enum border_side border_side)
+draw_component_content(struct libdecor_frame_cairo *frame_cairo,
+		       struct buffer *buffer,
+		       enum component component)
 {
-	uint32_t *pixels = buffer->data;
-	uint32_t color = 0x80303030;
-	int i;
+	cairo_surface_t *surface;
+	cairo_t *cr;
 
-	for (i = 0; i < buffer->width * buffer->height; i++)
-		pixels[i] = color;
+	/* button symbol origin */
+	const double x = BUTTON_WIDTH / 2 - SYM_DIM / 2 + 0.5;
+	const double y = TITLE_HEIGHT / 2 - SYM_DIM / 2 + 0.5;
+
+	enum libdecor_window_state state;
+
+	/* title fade out at buttons */
+	const int fade_width = 5 * BUTTON_WIDTH;
+	int fade_start;
+	cairo_pattern_t *fade;
+
+	/* clear buffer */
+	memset(buffer->data, 0, buffer->data_size);
+
+	surface = cairo_image_surface_create_for_data(
+			  buffer->data, CAIRO_FORMAT_ARGB32,
+			  buffer->width, buffer->height,
+			  cairo_format_stride_for_width(
+				  CAIRO_FORMAT_ARGB32,
+				  buffer->width)
+			  );
+
+	cr = cairo_create(surface);
+
+	/* background */
+	switch (component) {
+	case NONE:
+		break;
+	case SHADOW:
+		cairo_set_rgba32(cr, &COL_SHADOW);
+		break;
+	case TITLE:
+		cairo_set_rgba32(cr, &COL_TITLE);
+		break;
+	case BUTTON_MIN:
+		if (frame_cairo->active == &frame_cairo->title_bar.min)
+			cairo_set_rgba32(cr, &COL_BUTTON_MIN);
+		else
+			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		break;
+	case BUTTON_MAX:
+		if (frame_cairo->active == &frame_cairo->title_bar.max)
+			cairo_set_rgba32(cr, &COL_BUTTON_MAX);
+		else
+			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		break;
+	case BUTTON_CLOSE:
+		if (frame_cairo->active == &frame_cairo->title_bar.close)
+			cairo_set_rgba32(cr, &COL_BUTTON_CLOSE);
+		else
+			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		break;
+	}
+
+	cairo_paint(cr);
+
+	/* button symbols */
+	/* https://www.cairographics.org/FAQ/#sharp_lines */
+	cairo_set_line_width(cr, 1);
+
+	switch (component) {
+	case TITLE:
+		cairo_select_font_face(cr, "sans-serif",
+				       CAIRO_FONT_SLANT_NORMAL,
+				       CAIRO_FONT_WEIGHT_BOLD);
+		cairo_set_font_size(cr, SYM_DIM);
+		cairo_set_rgba32(cr, &COL_SYM);
+		cairo_move_to(cr, BUTTON_WIDTH, y + SYM_DIM - 1);
+		cairo_show_text(cr, libdecor_frame_get_title(
+					(struct libdecor_frame*)frame_cairo));
+		fade_start = libdecor_frame_get_content_width(
+				(struct libdecor_frame *)frame_cairo)-fade_width;
+		fade = cairo_pattern_create_linear(
+			       fade_start, 0, fade_start + 2 * BUTTON_WIDTH, 0);
+		cairo_pattern_add_color_stop_rgba(fade, 0, 0, 0, 0, 0);
+		cairo_pattern_add_color_stop_rgb(fade, 1,
+						 red(&COL_TITLE),
+						 green(&COL_TITLE),
+						 blue(&COL_TITLE));
+		cairo_rectangle(cr, fade_start, 0, fade_width, TITLE_HEIGHT);
+		cairo_set_source(cr, fade);
+		cairo_fill(cr);
+		cairo_pattern_destroy(fade);
+		break;
+	case BUTTON_MIN:
+		if (frame_cairo->active == &frame_cairo->title_bar.min)
+			cairo_set_rgba32(cr, &COL_SYM_ACT);
+		else
+			cairo_set_rgba32(cr, &COL_SYM);
+		cairo_move_to(cr, x, y + SYM_DIM - 1);
+		cairo_rel_line_to(cr, SYM_DIM - 1, 0);
+		cairo_stroke(cr);
+		break;
+	case BUTTON_MAX:
+		if (frame_cairo->active == &frame_cairo->title_bar.max)
+			cairo_set_rgba32(cr, &COL_SYM_ACT);
+		else
+			cairo_set_rgba32(cr, &COL_SYM);
+
+		state = libdecor_frame_get_window_state(
+				(struct libdecor_frame*)frame_cairo);
+		if (state & LIBDECOR_WINDOW_STATE_MAXIMIZED) {
+			const size_t small = 12;
+			cairo_rectangle(cr,
+					x,
+					y + SYM_DIM - small,
+					small - 1,
+					small - 1);
+			cairo_move_to(cr,
+				      x + SYM_DIM - small,
+				      y + SYM_DIM - small);
+			cairo_line_to(cr, x + SYM_DIM - small, y);
+			cairo_rel_line_to(cr, small - 1, 0);
+			cairo_rel_line_to(cr, 0, small - 1);
+			cairo_line_to(cr, x + small - 1, y + small - 1);
+		}
+		else {
+			cairo_rectangle(cr, x, y, SYM_DIM - 1, SYM_DIM - 1);
+		}
+		cairo_stroke(cr);
+		break;
+	case BUTTON_CLOSE:
+		if (frame_cairo->active == &frame_cairo->title_bar.close)
+			cairo_set_rgba32(cr, &COL_SYM_ACT);
+		else
+			cairo_set_rgba32(cr, &COL_SYM);
+		cairo_move_to(cr, x, y);
+		cairo_rel_line_to(cr, SYM_DIM - 1, SYM_DIM - 1);
+		cairo_move_to(cr, x + SYM_DIM - 1, y);
+		cairo_line_to(cr, x, y + SYM_DIM - 1);
+		cairo_stroke(cr);
+		break;
+	default:
+		break;
+	}
+
+	/* mask the toplevel surface */
+	if (component == SHADOW) {
+		int component_x, component_y, component_width, component_height;
+		calculate_component_size(frame_cairo, component,
+					 &component_x, &component_y,
+					 &component_width, &component_height);
+		cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
+		cairo_rectangle(cr, -component_x, -component_y,
+				libdecor_frame_get_content_width(
+					&frame_cairo->frame),
+				libdecor_frame_get_content_height(
+					&frame_cairo->frame));
+		cairo_fill(cr);
+	}
+
+	cairo_destroy(cr);
+	cairo_surface_destroy(surface);
 }
 
 static void
-draw_shadow_component(struct libdecor_frame_cairo *frame_cairo,
+set_component_input_region(struct libdecor_frame_cairo *frame_cairo,
+			   struct border_component *border_component)
+{
+	if (border_component->type == SHADOW) {
+		struct wl_region *input_region;
+		int component_x;
+		int component_y;
+		int component_width;
+		int component_height;
+
+		calculate_component_size(frame_cairo, border_component->type,
+					 &component_x, &component_y,
+					 &component_width, &component_height);
+
+		/*
+		 * the input region is the outer surface size minus the inner
+		 * content size
+		 */
+		input_region = wl_compositor_create_region(
+				       frame_cairo->plugin_cairo->wl_compositor);
+		wl_region_add(input_region, 0, 0,
+			      component_width, component_height);
+		wl_region_subtract(input_region, -component_x, -component_y,
+			libdecor_frame_get_content_width(&frame_cairo->frame),
+			libdecor_frame_get_content_height(&frame_cairo->frame));
+		wl_surface_set_input_region(border_component->wl_surface,
+					    input_region);
+		wl_region_destroy(input_region);
+	}
+}
+
+static void
+draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 		      struct border_component *border_component,
-		      enum border_side border_side)
+		      enum component component)
 {
 	struct libdecor_plugin_cairo *plugin_cairo = frame_cairo->plugin_cairo;
 	struct buffer *old_buffer;
@@ -426,9 +727,11 @@ draw_shadow_component(struct libdecor_frame_cairo *frame_cairo,
 	int component_width;
 	int component_height;
 
-	calculate_component_size(frame_cairo, border_side,
+	calculate_component_size(frame_cairo, component,
 				 &component_x, &component_y,
 				 &component_width, &component_height);
+
+	set_component_input_region(frame_cairo, border_component);
 
 	old_buffer = border_component->buffer;
 	if (old_buffer) {
@@ -442,22 +745,18 @@ draw_shadow_component(struct libdecor_frame_cairo *frame_cairo,
 		}
 	}
 
-	if (!buffer) {
+	if (!buffer)
 		buffer = create_shm_buffer(plugin_cairo,
 					   component_width,
 					   component_height);
-	}
 
-	draw_shadow_content(plugin_cairo, buffer, border_side);
+	draw_component_content(frame_cairo, buffer, component);
 
-	wl_surface_attach(border_component->wl_surface,
-			  buffer->wl_buffer,
-			  0, 0);
+	wl_surface_attach(border_component->wl_surface, buffer->wl_buffer, 0, 0);
 	buffer->in_use = true;
 	wl_surface_commit(border_component->wl_surface);
 	wl_surface_damage(border_component->wl_surface,
-			  0, 0,
-			  component_width, component_height);
+			  0, 0, component_width, component_height);
 	wl_subsurface_set_position(border_component->wl_subsurface,
 				   component_x, component_y);
 
@@ -465,21 +764,24 @@ draw_shadow_component(struct libdecor_frame_cairo *frame_cairo,
 }
 
 static void
-draw_shadow(struct libdecor_frame_cairo *frame_cairo)
+draw_border(struct libdecor_frame_cairo *frame_cairo)
 {
-	draw_shadow_component(frame_cairo,
-			      &frame_cairo->border.top,
-			      BORDER_SIDE_TOP);
-	draw_shadow_component(frame_cairo,
-			      &frame_cairo->border.right,
-			      BORDER_SIDE_RIGHT);
-	draw_shadow_component(frame_cairo,
-			      &frame_cairo->border.bottom,
-			      BORDER_SIDE_BOTTOM);
-	draw_shadow_component(frame_cairo,
-			      &frame_cairo->border.left,
-			      BORDER_SIDE_LEFT);
-	frame_cairo->border.is_showing = true;
+	draw_border_component(frame_cairo, &frame_cairo->shadow, SHADOW);
+	frame_cairo->shadow_showing = true;
+}
+
+static void
+draw_title_bar(struct libdecor_frame_cairo *frame_cairo)
+{
+	draw_border_component(frame_cairo,
+			      &frame_cairo->title_bar.title, TITLE);
+	draw_border_component(frame_cairo,
+			      &frame_cairo->title_bar.min, BUTTON_MIN);
+	draw_border_component(frame_cairo,
+			      &frame_cairo->title_bar.max, BUTTON_MAX);
+	draw_border_component(frame_cairo,
+			      &frame_cairo->title_bar.close, BUTTON_CLOSE);
+	frame_cairo->title_bar.is_showing = true;
 }
 
 static void
@@ -489,10 +791,24 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 	case DECORATION_TYPE_NONE:
 		if (is_border_surfaces_showing(frame_cairo))
 			hide_border_surfaces(frame_cairo);
+		if (is_title_bar_surfaces_showing(frame_cairo))
+			hide_title_bar_surfaces(frame_cairo);
 		break;
-	case DECORATION_TYPE_SHADOW:
+	case DECORATION_TYPE_ALL:
+		/* show borders */
 		ensure_border_surfaces(frame_cairo);
-		draw_shadow(frame_cairo);
+		draw_border(frame_cairo);
+		/* show title bar */
+		ensure_title_bar_surfaces(frame_cairo);
+		draw_title_bar(frame_cairo);
+		break;
+	case DECORATION_TYPE_TITLE_ONLY:
+		/* hide borders */
+		if (is_border_surfaces_showing(frame_cairo))
+			hide_border_surfaces(frame_cairo);
+		/* show title bar */
+		ensure_title_bar_surfaces(frame_cairo);
+		draw_title_bar(frame_cairo);
 		break;
 	}
 }
@@ -506,11 +822,22 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 
 	switch (frame_cairo->decoration_type) {
 	case DECORATION_TYPE_NONE:
-	case DECORATION_TYPE_SHADOW:
 		x = 0;
 		y = 0;
 		width = frame_cairo->content_width;
 		height = frame_cairo->content_height;
+		break;
+	case DECORATION_TYPE_ALL:
+		x = 0;
+		y = -(int)TITLE_HEIGHT;
+		width = frame_cairo->content_width;
+		height = frame_cairo->content_height + TITLE_HEIGHT;
+		break;
+	case DECORATION_TYPE_TITLE_ONLY:
+		x = 0;
+		y = -(int)TITLE_HEIGHT;
+		width = frame_cairo->content_width;
+		height = frame_cairo->content_height + TITLE_HEIGHT;
 		break;
 	}
 
@@ -521,11 +848,18 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 static enum decoration_type
 window_state_to_decoration_type(enum libdecor_window_state window_state)
 {
-	if ((window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED) ||
-	    (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN))
+	if (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)
 		return DECORATION_TYPE_NONE;
+	else if (window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
+		 window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
+		 window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT ||
+		 window_state & LIBDECOR_WINDOW_STATE_TILED_TOP ||
+		 window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)
+		/* title bar, no shadows */
+		return DECORATION_TYPE_TITLE_ONLY;
 	else
-		return DECORATION_TYPE_SHADOW;
+		/* title bar, shadows */
+		return DECORATION_TYPE_ALL;
 }
 
 static void
@@ -566,15 +900,44 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 }
 
 static bool
-libdecor_plugin_cairo_configuration_get_content_size(struct libdecor_plugin *plugin,
-						     struct libdecor_configuration *configuration,
-						     struct libdecor_frame *frame,
-						     int *content_width,
-						     int *content_height)
+libdecor_plugin_cairo_configuration_get_content_size(
+		struct libdecor_plugin *plugin,
+		struct libdecor_configuration *configuration,
+		struct libdecor_frame *frame,
+		int *content_width,
+		int *content_height)
 {
-	return libdecor_configuration_get_window_size(configuration,
-						      content_width,
-						      content_height);
+	int win_width, win_height;
+	if (!libdecor_configuration_get_window_size(configuration,
+						    &win_width,
+						    &win_height))
+		return false;
+
+	/*
+	 * 'libdecor_configuration_get_window_state' returns the pending state,
+	 * while 'libdecor_frame_get_window_state' gives the current state
+	 */
+	enum libdecor_window_state state;
+	if (!libdecor_configuration_get_window_state(configuration, &state)) {
+		return false;
+	}
+
+	switch (window_state_to_decoration_type(state)) {
+	case DECORATION_TYPE_NONE:
+		*content_width = win_width;
+		*content_height = win_height;
+		break;
+	case DECORATION_TYPE_ALL:
+		*content_width = win_width;
+		*content_height = win_height - TITLE_HEIGHT;
+		break;
+	case DECORATION_TYPE_TITLE_ONLY:
+		*content_width = win_width;
+		*content_height = win_height - TITLE_HEIGHT;
+		break;
+	}
+
+	return true;
 }
 
 static struct libdecor_plugin_interface cairo_plugin_iface = {
@@ -584,7 +947,8 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.frame_free = libdecor_plugin_cairo_frame_free,
 	.frame_commit = libdecor_plugin_cairo_frame_commit,
 
-	.configuration_get_content_size = libdecor_plugin_cairo_configuration_get_content_size,
+	.configuration_get_content_size =
+			libdecor_plugin_cairo_configuration_get_content_size,
 };
 
 static void
@@ -632,9 +996,10 @@ shm_callback(void *user_data,
 	struct libdecor *context = plugin_cairo->context;
 
 	if (!plugin_cairo->has_argb) {
-		libdecor_notify_plugin_error(context,
-					     LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-					     "Compositor is missing required shm format");
+		libdecor_notify_plugin_error(
+				context,
+				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+				"Compositor is missing required shm format");
 		return;
 	}
 
@@ -681,18 +1046,99 @@ ensure_cursor_theme(struct libdecor_plugin_cairo *plugin_cairo)
 	plugin_cairo->cursor_theme =
 		wl_cursor_theme_load(NULL, 24, plugin_cairo->wl_shm);
 
-	plugin_cairo->cursors.top_side =
+	for (int i = 0; i <= 8; i++) {
+		plugin_cairo->cursors[i] = wl_cursor_theme_get_cursor(
+						   plugin_cairo->cursor_theme,
+						   cursor_names[i]);
+	}
+
+	plugin_cairo->cursor_left_ptr =
 		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
-					   "top_side");
-	plugin_cairo->cursors.right_side =
-		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
-					   "right_side");
-	plugin_cairo->cursors.bottom_side =
-		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
-					   "bottom_side");
-	plugin_cairo->cursors.left_side =
-		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
-					   "left_side");
+					   "left_ptr");
+}
+
+enum libdecor_resize_edge
+component_edge(const struct border_component *cmpnt,
+	       const int pointer_x,
+	       const int pointer_y,
+	       const int margin)
+{
+	const bool top = pointer_y < margin;
+	const bool bottom = pointer_y > (cmpnt->buffer->height - margin);
+	const bool left = pointer_x < margin;
+	const bool right = pointer_x > (cmpnt->buffer->width - margin);
+
+	if (top)
+		if (left)
+			return LIBDECOR_RESIZE_EDGE_TOP_LEFT;
+		else if (right)
+			return LIBDECOR_RESIZE_EDGE_TOP_RIGHT;
+		else
+			return LIBDECOR_RESIZE_EDGE_TOP;
+	else if (bottom)
+		if (left)
+			return LIBDECOR_RESIZE_EDGE_BOTTOM_LEFT;
+		else if (right)
+			return LIBDECOR_RESIZE_EDGE_BOTTOM_RIGHT;
+		else
+			return LIBDECOR_RESIZE_EDGE_BOTTOM;
+	else if (left)
+		return LIBDECOR_RESIZE_EDGE_LEFT;
+	else if (right)
+		return LIBDECOR_RESIZE_EDGE_RIGHT;
+	else
+		return LIBDECOR_RESIZE_EDGE_NONE;
+}
+
+void
+set_cursor(struct seat *seat, struct wl_pointer *wl_pointer)
+{
+	if (!seat->pointer_focus)
+		return;
+
+	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
+	struct libdecor_frame_cairo *frame_cairo =
+			wl_surface_get_user_data(seat->pointer_focus);
+	struct wl_cursor *wl_cursor = NULL;
+	enum libdecor_resize_edge edge = LIBDECOR_RESIZE_EDGE_NONE;
+	struct wl_cursor_image *image;
+	struct wl_buffer *buffer;
+
+	if (!frame_cairo || !frame_cairo->active)
+		return;
+
+	switch (frame_cairo->active->type) {
+	case NONE:
+		wl_cursor = NULL;
+		break;
+	case SHADOW:
+		edge = component_edge(frame_cairo->active, seat->pointer_x,
+				      seat->pointer_y, SHADOW_MARGIN);
+		break;
+	case TITLE:
+	case BUTTON_MIN:
+	case BUTTON_MAX:
+	case BUTTON_CLOSE:
+		wl_cursor = plugin_cairo->cursor_left_ptr;
+		break;
+	}
+
+	if (edge != LIBDECOR_RESIZE_EDGE_NONE)
+		wl_cursor = plugin_cairo->cursors[edge-1];
+
+	if (wl_cursor == NULL)
+		return;
+
+	image = wl_cursor->images[0];
+	buffer = wl_cursor_image_get_buffer(image);
+	wl_pointer_set_cursor(wl_pointer, seat->serial,
+			      seat->cursor_surface,
+			      image->hotspot_x,
+			      image->hotspot_y);
+	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
+	wl_surface_damage(seat->cursor_surface, 0, 0,
+			  image->width, image->height);
+	wl_surface_commit(seat->cursor_surface);
 }
 
 static void
@@ -706,45 +1152,48 @@ pointer_enter(void *data,
 	struct seat *seat = data;
 	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
 	struct libdecor_frame_cairo *frame_cairo;
-	struct wl_cursor *wl_cursor;
-	struct wl_cursor_image *image;
-	struct wl_buffer *buffer;
-	const char * const *tag;
 
-	tag = wl_proxy_get_tag((struct wl_proxy *) surface);
-	if (tag != &libdecoration_cairo_proxy_tag)
+	if (!own_surface(surface))
 		return;
+
+	frame_cairo = wl_surface_get_user_data(surface);
 
 	ensure_cursor_surface(seat);
 	ensure_cursor_theme(plugin_cairo);
 
+	seat->pointer_x = wl_fixed_to_int(surface_x);
+	seat->pointer_y = wl_fixed_to_int(surface_y);
+	seat->serial = serial;
 	seat->pointer_focus = surface;
 
-	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
 	if (!frame_cairo)
 		return;
 
-	if (seat->pointer_focus == frame_cairo->border.top.wl_surface)
-		wl_cursor = plugin_cairo->cursors.top_side;
-	else if (seat->pointer_focus == frame_cairo->border.right.wl_surface)
-		wl_cursor = plugin_cairo->cursors.right_side;
-	else if (seat->pointer_focus == frame_cairo->border.bottom.wl_surface)
-		wl_cursor = plugin_cairo->cursors.bottom_side;
-	else if (seat->pointer_focus == frame_cairo->border.left.wl_surface)
-		wl_cursor = plugin_cairo->cursors.left_side;
-	else
-		return;
+	frame_cairo->active = NULL;
 
-	image = wl_cursor->images[0];
-	buffer = wl_cursor_image_get_buffer(image);
-	wl_pointer_set_cursor(wl_pointer, serial,
-			      seat->cursor_surface,
-			      image->hotspot_x,
-			      image->hotspot_y);
-	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
-	wl_surface_damage(seat->cursor_surface, 0, 0,
-			  image->width, image->height);
-	wl_surface_commit(seat->cursor_surface);
+	if (seat->pointer_focus == frame_cairo->shadow.wl_surface) {
+		frame_cairo->active = &frame_cairo->shadow;
+	}
+	else if (seat->pointer_focus == frame_cairo->title_bar.title.wl_surface) {
+		frame_cairo->active = &frame_cairo->title_bar.title;
+	}
+	else if (seat->pointer_focus == frame_cairo->title_bar.min.wl_surface) {
+		frame_cairo->active = &frame_cairo->title_bar.min;
+	}
+	else if (seat->pointer_focus == frame_cairo->title_bar.max.wl_surface) {
+		frame_cairo->active = &frame_cairo->title_bar.max;
+	}
+	else if (seat->pointer_focus == frame_cairo->title_bar.close.wl_surface) {
+		frame_cairo->active = &frame_cairo->title_bar.close;
+	}
+
+	/* update decorations */
+	if (frame_cairo->active) {
+		draw_decoration(frame_cairo);
+		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	}
+
+	set_cursor(seat, wl_pointer);
 }
 
 static void
@@ -754,8 +1203,19 @@ pointer_leave(void *data,
 	      struct wl_surface *surface)
 {
 	struct seat *seat = data;
+	struct libdecor_frame_cairo *frame_cairo;
+
+	if (!own_surface(surface))
+		return;
+
+	frame_cairo = wl_surface_get_user_data(surface);
 
 	seat->pointer_focus = NULL;
+	if (frame_cairo) {
+		frame_cairo->active = NULL;
+		draw_decoration(frame_cairo);
+		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	}
 }
 
 static void
@@ -765,6 +1225,11 @@ pointer_motion(void *data,
 	       wl_fixed_t surface_x,
 	       wl_fixed_t surface_y)
 {
+	struct seat *seat = data;
+
+	seat->pointer_x = wl_fixed_to_int(surface_x);
+	seat->pointer_y = wl_fixed_to_int(surface_y);
+	set_cursor(seat, wl_pointer);
 }
 
 static void
@@ -778,31 +1243,74 @@ pointer_button(void *data,
 	struct seat *seat = data;
 	struct libdecor_frame_cairo *frame_cairo;
 
-	if (!seat->pointer_focus)
+	if (!seat->pointer_focus || !own_surface(seat->pointer_focus))
 		return;
 
 	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
 	if (!frame_cairo)
 		return;
 
-	if (button == BTN_LEFT && state) {
-		enum libdecor_resize_edge edge;
+	if (button == BTN_LEFT) {
+		if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			enum libdecor_resize_edge edge =
+					LIBDECOR_RESIZE_EDGE_NONE;
+			switch (frame_cairo->active->type) {
+			case SHADOW:
+				edge = component_edge(frame_cairo->active,
+						      seat->pointer_x,
+						      seat->pointer_y,
+						      SHADOW_MARGIN);
+				break;
+			case TITLE:
+				if (time-seat->pointer_button_time_stamp <
+				    DOUBLE_CLICK_TIME_MS) {
+					toggle_maximized(&frame_cairo->frame);
+				}
+				else {
+					seat->pointer_button_time_stamp = time;
+					libdecor_frame_move(&frame_cairo->frame,
+							    seat->wl_seat,
+							    serial);
+				}
+				break;
+			default:
+				break;
+			}
 
-		if (seat->pointer_focus == frame_cairo->border.top.wl_surface)
-			edge = LIBDECOR_RESIZE_EDGE_TOP;
-		else if (seat->pointer_focus == frame_cairo->border.right.wl_surface)
-			edge = LIBDECOR_RESIZE_EDGE_RIGHT;
-		else if (seat->pointer_focus == frame_cairo->border.bottom.wl_surface)
-			edge = LIBDECOR_RESIZE_EDGE_BOTTOM;
-		else if (seat->pointer_focus == frame_cairo->border.left.wl_surface)
-			edge = LIBDECOR_RESIZE_EDGE_LEFT;
-		else
-			return;
-
-		libdecor_frame_resize(&frame_cairo->frame,
-				      seat->wl_seat,
-				      serial,
-				      edge);
+			if (edge != LIBDECOR_RESIZE_EDGE_NONE) {
+				libdecor_frame_resize(
+					&frame_cairo->frame,
+					seat->wl_seat,
+					serial,
+					edge);
+			}
+		}
+		else if (state == WL_POINTER_BUTTON_STATE_RELEASED) {
+			switch (frame_cairo->active->type) {
+			case BUTTON_MIN:
+				libdecor_frame_set_minimized(
+							&frame_cairo->frame);
+				break;
+			case BUTTON_MAX:
+				toggle_maximized(&frame_cairo->frame);
+				break;
+			case BUTTON_CLOSE:
+				libdecor_frame_close(&frame_cairo->frame);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	else if (button == BTN_RIGHT &&
+		 state == WL_POINTER_BUTTON_STATE_PRESSED &&
+		 seat->pointer_focus == frame_cairo->title_bar.title.wl_surface) {
+			libdecor_frame_show_window_menu(&frame_cairo->frame,
+							seat->wl_seat,
+							serial,
+							seat->pointer_x,
+							seat->pointer_y
+							-TITLE_HEIGHT);
 	}
 }
 
@@ -923,9 +1431,10 @@ globals_callback(void *user_data,
 	if (!has_required_globals(plugin_cairo)) {
 		struct libdecor *context = plugin_cairo->context;
 
-		libdecor_notify_plugin_error(context,
-					     LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-					     "Compositor is missing required globals");
+		libdecor_notify_plugin_error(
+				context,
+				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+				"Compositor is missing required globals");
 	}
 }
 
