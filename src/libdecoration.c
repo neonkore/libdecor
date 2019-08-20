@@ -564,19 +564,39 @@ libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_maximize(struct libdecor_frame *frame)
+libdecor_frame_set_minimized(struct libdecor_frame *frame)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
-
-	xdg_toplevel_set_maximized(frame_priv->xdg_toplevel);
+	xdg_toplevel_set_minimized(frame->priv->xdg_toplevel);
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_unmaximize(struct libdecor_frame *frame)
+libdecor_frame_set_maximized(struct libdecor_frame *frame)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
+	xdg_toplevel_set_maximized(frame->priv->xdg_toplevel);
+}
 
-	xdg_toplevel_unset_maximized(frame_priv->xdg_toplevel);
+LIBDECOR_EXPORT void
+libdecor_frame_unset_maximized(struct libdecor_frame *frame)
+{
+	xdg_toplevel_unset_maximized(frame->priv->xdg_toplevel);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame)
+{
+	xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, NULL);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_unset_fullscreen(struct libdecor_frame *frame)
+{
+	xdg_toplevel_unset_fullscreen(frame->priv->xdg_toplevel);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_close(struct libdecor_frame *frame)
+{
+	xdg_toplevel_close(frame, frame->priv->xdg_toplevel);
 }
 
 static void

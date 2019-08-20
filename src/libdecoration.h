@@ -146,6 +146,24 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_configuration *configuration);
 
 void
+libdecor_frame_set_minimized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_set_maximized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_unset_maximized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame);
+
+void
+libdecor_frame_unset_fullscreen(struct libdecor_frame *frame);
+
+void
+libdecor_frame_close(struct libdecor_frame *frame);
+
+void
 libdecor_frame_map(struct libdecor_frame *frame);
 
 struct libdecor_state *
