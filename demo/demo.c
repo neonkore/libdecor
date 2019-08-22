@@ -390,10 +390,8 @@ handle_configure(struct libdecor_frame *frame,
 		height = window->content_height;
 	}
 
-	if (width == 0 || height == 0) {
-		width = DEFAULT_WIDTH;
-		height = DEFAULT_HEIGHT;
-	}
+	width = (width == 0) ? DEFAULT_WIDTH : width;
+	height = (height == 0) ? DEFAULT_HEIGHT : height;
 
 	if (!libdecor_configuration_get_window_state(configuration, &window_state))
 		window_state = LIBDECOR_WINDOW_STATE_NONE;
