@@ -65,6 +65,7 @@ static struct wl_pointer *wl_pointer;
 static struct wl_cursor_theme *cursor_theme;
 static struct wl_cursor *left_ptr_cursor;
 static struct wl_surface *cursor_surface;
+static struct wl_surface *pointer_focus;
 
 static bool has_xrgb = false;
 
@@ -95,6 +96,8 @@ pointer_enter(void *data,
 	struct wl_cursor_image *image;
 	struct wl_buffer *buffer;
 
+	pointer_focus = surface;
+
 	if (surface != window->wl_surface)
 		return;
 
@@ -118,6 +121,7 @@ pointer_leave(void *data,
 	      uint32_t serial,
 	      struct wl_surface *surface)
 {
+	pointer_focus = NULL;
 }
 
 static void
@@ -137,7 +141,9 @@ pointer_button(void *data,
 	       uint32_t button,
 	       uint32_t state)
 {
-	if (button == BTN_LEFT && state) {
+	if (button == BTN_LEFT &&
+	    state == WL_POINTER_BUTTON_STATE_PRESSED &&
+	    pointer_focus == window->wl_surface) {
 		libdecor_frame_move(window->frame, wl_seat, serial);
 	}
 }
@@ -464,6 +470,6 @@ main(int argc,
 
 	while (ret != -1)
 		ret = wl_display_dispatch(wl_display);
-	
+
 	return EXIT_SUCCESS;
 }
