@@ -106,6 +106,10 @@ struct libdecor_frame_private {
 	int content_height;
 
 	enum libdecor_window_state window_state;
+
+	/* stored dimensions of the floating state */
+	int floating_width;
+	int floating_height;
 };
 
 static void
@@ -294,13 +298,38 @@ xdg_toplevel_configure(void *user_data,
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	enum libdecor_window_state window_state;
 
+	window_state = parse_states(states);
+
 	frame_priv->pending_configuration = libdecor_configuration_new();
 
 	frame_priv->pending_configuration->has_size = true;
-	frame_priv->pending_configuration->window_width = width;
-	frame_priv->pending_configuration->window_height = height;
+	if (width == 0 && height == 0) {
+		/* client needs to determine window dimensions
+		 * This might happen at the first configuration or after an
+		 * unmaximizing request. In any case, we will forward the stored
+		 * unmaximized state, which will either contain values stored
+		 * by the maximizing request, or 0.
+		 */
+		frame_priv->pending_configuration->window_width =
+				frame->priv->floating_width;
+		frame_priv->pending_configuration->window_height =
+				frame->priv->floating_height;
+	} else {
+		if (!(window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
+		      window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_TOP ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)) {
+			/* store state if not already maximized or tiled */
+			frame->priv->floating_width = width;
+			frame->priv->floating_height = height;
+		}
 
-	window_state = parse_states(states);
+		frame_priv->pending_configuration->window_width = width;
+		frame_priv->pending_configuration->window_height = height;
+	}
+
 	frame_priv->pending_configuration->has_window_state = true;
 	frame_priv->pending_configuration->window_state = window_state;
 }
