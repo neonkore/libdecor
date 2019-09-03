@@ -263,6 +263,18 @@ parse_states(struct wl_array *states)
 		case XDG_TOPLEVEL_STATE_ACTIVATED:
 			pending_state |= LIBDECOR_WINDOW_STATE_ACTIVE;
 			break;
+		case XDG_TOPLEVEL_STATE_TILED_LEFT:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_LEFT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_RIGHT:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_RIGHT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_TOP:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_TOP;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_BOTTOM:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_BOTTOM;
+			break;
 		default:
 			break;
 		}
@@ -716,7 +728,7 @@ init_xdg_wm_base(struct libdecor *context,
 	context->xdg_wm_base = wl_registry_bind(context->wl_registry,
 						id,
 						&xdg_wm_base_interface,
-						1);
+						MIN(version,2));
 	xdg_wm_base_add_listener(context->xdg_wm_base,
 				 &xdg_wm_base_listener,
 				 context);

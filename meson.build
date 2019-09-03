@@ -9,7 +9,7 @@ cc = meson.get_compiler('c')
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
 wayland_client_req = '>= 1.0'
-wayland_protocols_req = '>= 1.13'
+wayland_protocols_req = '>= 1.14'
 
 wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
 wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protocols_req)
