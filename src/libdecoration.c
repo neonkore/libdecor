@@ -483,6 +483,12 @@ libdecor_frame_set_title(struct libdecor_frame *frame,
 	xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
 }
 
+LIBDECOR_EXPORT const char *
+libdecor_frame_get_title(struct libdecor_frame *frame)
+{
+	return frame->priv->state.title;
+}
+
 LIBDECOR_EXPORT void
 libdecor_frame_set_app_id(struct libdecor_frame *frame,
 			  const char *app_id)

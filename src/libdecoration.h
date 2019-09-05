@@ -112,6 +112,9 @@ void
 libdecor_frame_set_title(struct libdecor_frame *frame,
 			 const char *title);
 
+const char *
+libdecor_frame_get_title(struct libdecor_frame *frame);
+
 void
 libdecor_frame_set_app_id(struct libdecor_frame *frame,
 			  const char *app_id);
