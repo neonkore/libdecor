@@ -16,7 +16,7 @@ wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protoco
 dl_dep = cc.find_library('dl', required: true)
 
 required_functions = [
-  'mkostemp',
+  'memfd_create',
   'posix_fallocate',
   'asprintf',
 ]

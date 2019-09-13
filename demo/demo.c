@@ -259,45 +259,18 @@ static const struct wl_buffer_listener buffer_listener = {
 };
 
 static int
-create_tmpfile_cloexec(char *tmpname)
-{
-	int fd;
-
-	fd = mkostemp(tmpname, O_CLOEXEC);
-	if (fd >= 0)
-		unlink(tmpname);
-
-	return fd;
-}
-
-static int
 create_anonymous_file(off_t size)
 {
-	static const char template[] = "/libdecor-demo-shared-XXXXXX";
-	const char *path;
-	char *name;
 	int fd;
+
 	int ret;
 
-	path = getenv("XDG_RUNTIME_DIR");
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
-	name = malloc(strlen(path) + sizeof(template));
-	if (!name)
-		return -1;
-
-	strcpy(name, path);
-	strcat(name, template);
-
-	fd = create_tmpfile_cloexec(name);
-
-	free(name);
+	fd = memfd_create("libdecor-demo", MFD_CLOEXEC | MFD_ALLOW_SEALING);
 
 	if (fd < 0)
 		return -1;
+
+	fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
 
 	do {
 		ret = posix_fallocate(fd, 0, size);
