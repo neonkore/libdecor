@@ -4,6 +4,7 @@ wayland_cursor_dep = dependency('wayland-cursor')
 shared_module('decoration-cairo',
   sources: [
     'libdecoration-cairo.c',
+    'libdecoration-cairo-blur.c',
   ],
   include_directories: [
     top_includepath,

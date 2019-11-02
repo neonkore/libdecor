@@ -29,6 +29,7 @@
 #include <stdlib.h>
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 static inline void *
 zalloc(size_t size)

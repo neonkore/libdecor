@@ -41,12 +41,13 @@
 
 #include <cairo/cairo.h>
 
+#include "libdecoration-cairo-blur.h"
+
 static const size_t SHADOW_MARGIN = 24;	/* graspable part of the border */
 static const size_t TITLE_HEIGHT = 24;
 static const size_t BUTTON_WIDTH = 32;
 static const size_t SYM_DIM = 14;
 
-static const uint32_t COL_SHADOW = 0x80303030;
 static const uint32_t COL_TITLE = 0xFF080706;
 static const uint32_t COL_BUTTON_MIN = 0xFFFFBB00;
 static const uint32_t COL_BUTTON_MAX = 0xFF238823;
@@ -156,6 +157,9 @@ struct libdecor_frame_cairo {
 		struct border_component max;
 		struct border_component close;
 	} title_bar;
+
+	/* store pre-processed shadow tile */
+	cairo_surface_t *shadow_blur;
 };
 
 struct libdecor_plugin_cairo {
@@ -219,6 +223,30 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 	wl_registry_destroy(plugin_cairo->wl_registry);
 }
 
+static struct libdecor_frame_cairo *
+libdecor_frame_cairo_new(struct libdecor_plugin_cairo *plugin_cairo)
+{
+	struct libdecor_frame_cairo *frame_cairo = zalloc(sizeof *frame_cairo);
+	cairo_t *cr;
+
+	static const int size = 128;
+	static const int boundary = 32;
+
+	frame_cairo->plugin_cairo = plugin_cairo;
+	frame_cairo->shadow_blur = cairo_image_surface_create(
+					CAIRO_FORMAT_ARGB32, size, size);
+
+	cr = cairo_create(frame_cairo->shadow_blur);
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+	cairo_set_source_rgba(cr, 0, 0, 0, 1);
+	cairo_rectangle(cr, boundary, boundary, size-2*boundary, size-2*boundary);
+	cairo_fill(cr);
+	cairo_destroy(cr);
+	blur_surface(frame_cairo->shadow_blur, 64);
+
+	return frame_cairo;
+}
+
 static struct libdecor_frame *
 libdecor_plugin_cairo_frame_new(struct libdecor_plugin *plugin)
 {
@@ -226,8 +254,7 @@ libdecor_plugin_cairo_frame_new(struct libdecor_plugin *plugin)
 		(struct libdecor_plugin_cairo *) plugin;
 	struct libdecor_frame_cairo *frame_cairo;
 
-	frame_cairo = zalloc(sizeof *frame_cairo);
-	frame_cairo->plugin_cairo = plugin_cairo;
+	frame_cairo = libdecor_frame_cairo_new(plugin_cairo);
 
 	return &frame_cairo->frame;
 }
@@ -448,8 +475,8 @@ ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 	}
 
 	libdecor_frame_set_min_content_size(&frame_cairo->frame,
-					    4 * BUTTON_WIDTH,
-					    TITLE_HEIGHT + 1);
+					    MAX(56, 4 * BUTTON_WIDTH),
+					    MAX(56, TITLE_HEIGHT + 1));
 }
 
 static void
@@ -556,32 +583,41 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	case NONE:
 		break;
 	case SHADOW:
-		cairo_set_rgba32(cr, &COL_SHADOW);
+		render_shadow(cr,
+			      frame_cairo->shadow_blur,
+			      -(int)SHADOW_MARGIN/2,
+			      -(int)SHADOW_MARGIN/2,
+			      buffer->width + SHADOW_MARGIN,
+			      buffer->height + SHADOW_MARGIN,
+			      64,
+			      64);
 		break;
 	case TITLE:
 		cairo_set_rgba32(cr, &COL_TITLE);
+		cairo_paint(cr);
 		break;
 	case BUTTON_MIN:
 		if (frame_cairo->active == &frame_cairo->title_bar.min)
 			cairo_set_rgba32(cr, &COL_BUTTON_MIN);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		cairo_paint(cr);
 		break;
 	case BUTTON_MAX:
 		if (frame_cairo->active == &frame_cairo->title_bar.max)
 			cairo_set_rgba32(cr, &COL_BUTTON_MAX);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		cairo_paint(cr);
 		break;
 	case BUTTON_CLOSE:
 		if (frame_cairo->active == &frame_cairo->title_bar.close)
 			cairo_set_rgba32(cr, &COL_BUTTON_CLOSE);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
+		cairo_paint(cr);
 		break;
 	}
-
-	cairo_paint(cr);
 
 	/* button symbols */
 	/* https://www.cairographics.org/FAQ/#sharp_lines */
