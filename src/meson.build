@@ -10,6 +10,12 @@ libdecoration_sources = [
   'libdecoration-fallback.c',
 ]
 
+libdecoration_headers = [
+  'libdecoration.h',
+  'libdecoration-plugin.h',
+]
+install_headers(libdecoration_headers, subdir : 'libdecoration')
+
 libdecoration_built_sources = []
 
 wayland_scanner = find_program('wayland-scanner')
