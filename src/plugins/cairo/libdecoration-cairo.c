@@ -825,10 +825,10 @@ pointer_button(void *data,
 		else
 			return;
 
-		libdecor_frame_request_interactive_resize(&frame_cairo->frame,
-							  seat->wl_seat,
-							  serial,
-							  edge);
+		libdecor_frame_resize(&frame_cairo->frame,
+				      seat->wl_seat,
+				      serial,
+				      edge);
 	}
 }
 

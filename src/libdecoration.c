@@ -540,10 +540,10 @@ edge_to_xdg_edge(enum libdecor_resize_edge edge)
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
-					  struct wl_seat *wl_seat,
-					  uint32_t serial,
-					  enum libdecor_resize_edge edge)
+libdecor_frame_resize(struct libdecor_frame *frame,
+		      struct wl_seat *wl_seat,
+		      uint32_t serial,
+		      enum libdecor_resize_edge edge)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	enum xdg_toplevel_resize_edge xdg_edge;
@@ -554,9 +554,9 @@ libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
-					struct wl_seat *wl_seat,
-					uint32_t serial)
+libdecor_frame_move(struct libdecor_frame *frame,
+		    struct wl_seat *wl_seat,
+		    uint32_t serial)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 

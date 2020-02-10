@@ -130,15 +130,15 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 				    int content_height);
 
 void
-libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
-					  struct wl_seat *wl_seat,
-					  uint32_t serial,
-					  enum libdecor_resize_edge edge);
+libdecor_frame_resize(struct libdecor_frame *frame,
+		      struct wl_seat *wl_seat,
+		      uint32_t serial,
+		      enum libdecor_resize_edge edge);
 
 void
-libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
-					struct wl_seat *wl_seat,
-					uint32_t serial);
+libdecor_frame_move(struct libdecor_frame *frame,
+		    struct wl_seat *wl_seat,
+		    uint32_t serial);
 
 void
 libdecor_frame_commit(struct libdecor_frame *frame,
