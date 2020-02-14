@@ -106,6 +106,10 @@ struct libdecor_frame_private {
 	int content_height;
 
 	enum libdecor_window_state window_state;
+
+	/* stored dimensions of the floating state */
+	int floating_width;
+	int floating_height;
 };
 
 static void
@@ -263,6 +267,18 @@ parse_states(struct wl_array *states)
 		case XDG_TOPLEVEL_STATE_ACTIVATED:
 			pending_state |= LIBDECOR_WINDOW_STATE_ACTIVE;
 			break;
+		case XDG_TOPLEVEL_STATE_TILED_LEFT:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_LEFT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_RIGHT:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_RIGHT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_TOP:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_TOP;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_BOTTOM:
+			pending_state |= LIBDECOR_WINDOW_STATE_TILED_BOTTOM;
+			break;
 		default:
 			break;
 		}
@@ -282,13 +298,38 @@ xdg_toplevel_configure(void *user_data,
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	enum libdecor_window_state window_state;
 
+	window_state = parse_states(states);
+
 	frame_priv->pending_configuration = libdecor_configuration_new();
 
 	frame_priv->pending_configuration->has_size = true;
-	frame_priv->pending_configuration->window_width = width;
-	frame_priv->pending_configuration->window_height = height;
+	if (width == 0 && height == 0) {
+		/* client needs to determine window dimensions
+		 * This might happen at the first configuration or after an
+		 * unmaximizing request. In any case, we will forward the stored
+		 * unmaximized state, which will either contain values stored
+		 * by the maximizing request, or 0.
+		 */
+		frame_priv->pending_configuration->window_width =
+				frame->priv->floating_width;
+		frame_priv->pending_configuration->window_height =
+				frame->priv->floating_height;
+	} else {
+		if (!(window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
+		      window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_TOP ||
+		      window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)) {
+			/* store state if not already maximized or tiled */
+			frame->priv->floating_width = width;
+			frame->priv->floating_height = height;
+		}
 
-	window_state = parse_states(states);
+		frame_priv->pending_configuration->window_width = width;
+		frame_priv->pending_configuration->window_height = height;
+	}
+
 	frame_priv->pending_configuration->has_window_state = true;
 	frame_priv->pending_configuration->window_state = window_state;
 }
@@ -442,6 +483,12 @@ libdecor_frame_set_title(struct libdecor_frame *frame,
 	xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
 }
 
+LIBDECOR_EXPORT const char *
+libdecor_frame_get_title(struct libdecor_frame *frame)
+{
+	return frame->priv->state.title;
+}
+
 LIBDECOR_EXPORT void
 libdecor_frame_set_app_id(struct libdecor_frame *frame,
 			  const char *app_id)
@@ -540,10 +587,10 @@ edge_to_xdg_edge(enum libdecor_resize_edge edge)
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
-					  struct wl_seat *wl_seat,
-					  uint32_t serial,
-					  enum libdecor_resize_edge edge)
+libdecor_frame_resize(struct libdecor_frame *frame,
+		      struct wl_seat *wl_seat,
+		      uint32_t serial,
+		      enum libdecor_resize_edge edge)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	enum xdg_toplevel_resize_edge xdg_edge;
@@ -554,9 +601,9 @@ libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
-					struct wl_seat *wl_seat,
-					uint32_t serial)
+libdecor_frame_move(struct libdecor_frame *frame,
+		    struct wl_seat *wl_seat,
+		    uint32_t serial)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
@@ -564,19 +611,39 @@ libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_maximize(struct libdecor_frame *frame)
+libdecor_frame_set_minimized(struct libdecor_frame *frame)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
-
-	xdg_toplevel_set_maximized(frame_priv->xdg_toplevel);
+	xdg_toplevel_set_minimized(frame->priv->xdg_toplevel);
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_request_unmaximize(struct libdecor_frame *frame)
+libdecor_frame_set_maximized(struct libdecor_frame *frame)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
+	xdg_toplevel_set_maximized(frame->priv->xdg_toplevel);
+}
 
-	xdg_toplevel_unset_maximized(frame_priv->xdg_toplevel);
+LIBDECOR_EXPORT void
+libdecor_frame_unset_maximized(struct libdecor_frame *frame)
+{
+	xdg_toplevel_unset_maximized(frame->priv->xdg_toplevel);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame)
+{
+	xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, NULL);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_unset_fullscreen(struct libdecor_frame *frame)
+{
+	xdg_toplevel_unset_fullscreen(frame->priv->xdg_toplevel);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_close(struct libdecor_frame *frame)
+{
+	xdg_toplevel_close(frame, frame->priv->xdg_toplevel);
 }
 
 static void
@@ -696,7 +763,7 @@ init_xdg_wm_base(struct libdecor *context,
 	context->xdg_wm_base = wl_registry_bind(context->wl_registry,
 						id,
 						&xdg_wm_base_interface,
-						1);
+						MIN(version,2));
 	xdg_wm_base_add_listener(context->xdg_wm_base,
 				 &xdg_wm_base_listener,
 				 context);

@@ -56,6 +56,10 @@ enum libdecor_window_state {
 	LIBDECOR_WINDOW_STATE_ACTIVE = 1 << 0,
 	LIBDECOR_WINDOW_STATE_MAXIMIZED = 1 << 1,
 	LIBDECOR_WINDOW_STATE_FULLSCREEN = 1 << 2,
+	LIBDECOR_WINDOW_STATE_TILED_LEFT = 1 << 3,
+	LIBDECOR_WINDOW_STATE_TILED_RIGHT = 1 << 4,
+	LIBDECOR_WINDOW_STATE_TILED_TOP = 1 << 5,
+	LIBDECOR_WINDOW_STATE_TILED_BOTTOM = 1 << 6,
 };
 
 enum libdecor_resize_edge {
@@ -108,6 +112,9 @@ void
 libdecor_frame_set_title(struct libdecor_frame *frame,
 			 const char *title);
 
+const char *
+libdecor_frame_get_title(struct libdecor_frame *frame);
+
 void
 libdecor_frame_set_app_id(struct libdecor_frame *frame,
 			  const char *app_id);
@@ -130,20 +137,38 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 				    int content_height);
 
 void
-libdecor_frame_request_interactive_resize(struct libdecor_frame *frame,
-					  struct wl_seat *wl_seat,
-					  uint32_t serial,
-					  enum libdecor_resize_edge edge);
+libdecor_frame_resize(struct libdecor_frame *frame,
+		      struct wl_seat *wl_seat,
+		      uint32_t serial,
+		      enum libdecor_resize_edge edge);
 
 void
-libdecor_frame_request_interactive_move(struct libdecor_frame *frame,
-					struct wl_seat *wl_seat,
-					uint32_t serial);
+libdecor_frame_move(struct libdecor_frame *frame,
+		    struct wl_seat *wl_seat,
+		    uint32_t serial);
 
 void
 libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_state *state,
 		      struct libdecor_configuration *configuration);
+
+void
+libdecor_frame_set_minimized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_set_maximized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_unset_maximized(struct libdecor_frame *frame);
+
+void
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame);
+
+void
+libdecor_frame_unset_fullscreen(struct libdecor_frame *frame);
+
+void
+libdecor_frame_close(struct libdecor_frame *frame);
 
 void
 libdecor_frame_map(struct libdecor_frame *frame);

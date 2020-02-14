@@ -138,9 +138,7 @@ pointer_button(void *data,
 	       uint32_t state)
 {
 	if (button == BTN_LEFT && state) {
-		libdecor_frame_request_interactive_move(window->frame,
-							wl_seat,
-							serial);
+		libdecor_frame_move(window->frame, wl_seat, serial);
 	}
 }
 
