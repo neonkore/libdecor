@@ -127,6 +127,8 @@ struct libdecor_plugin_cairo {
 	} cursors;
 };
 
+static const char *libdecoration_cairo_proxy_tag = "libdecoration-cairo";
+
 struct libdecor_plugin *
 libdecor_plugin_new(struct libdecor *context);
 
@@ -349,6 +351,8 @@ create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 
 	wl_surface = wl_compositor_create_surface(wl_compositor);
 	wl_surface_set_user_data(wl_surface, frame_cairo);
+	wl_proxy_set_tag((struct wl_proxy *) wl_surface,
+			 &libdecoration_cairo_proxy_tag);
 
 	parent = libdecor_frame_get_wl_surface(frame);
 	wl_subsurface = wl_subcompositor_get_subsurface(wl_subcompositor,
@@ -732,6 +736,11 @@ pointer_enter(void *data,
 	struct wl_cursor *wl_cursor;
 	struct wl_cursor_image *image;
 	struct wl_buffer *buffer;
+	const char * const *tag;
+
+	tag = wl_proxy_get_tag((struct wl_proxy *) surface);
+	if (tag != &libdecoration_cairo_proxy_tag)
+		return;
 
 	ensure_cursor_surface(seat);
 	ensure_cursor_theme(plugin_cairo);
