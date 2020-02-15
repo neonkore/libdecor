@@ -8,7 +8,7 @@ cc = meson.get_compiler('c')
 
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
-wayland_client_req = '>= 1.0'
+wayland_client_req = '>= 1.18'
 wayland_protocols_req = '>= 1.14'
 
 wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
