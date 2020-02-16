@@ -434,6 +434,11 @@ main(int argc,
 	int ret = 0;
 
 	wl_display = wl_display_connect(NULL);
+	if (!wl_display) {
+		fprintf(stderr, "No Wayland connection\n");
+		return EXIT_FAILURE;
+	}
+
 	wl_registry = wl_display_get_registry(wl_display);
 	wl_registry_add_listener(wl_registry,
 				 &registry_listener,
