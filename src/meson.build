@@ -23,20 +23,27 @@ libdecoration_built_sources = []
 wayland_scanner = find_program('wayland-scanner')
 
 # Format:
+#  - protocol stability
 #  - protocol name
+#  - optional: protocol version, if unstable
 wayland_protocols = [
-  ['xdg-shell'],
+  ['stable', 'xdg-shell'],
 ]
 
 protocols_dir = wayland_protocols_dep.get_pkgconfig_variable('pkgdatadir')
 assert(protocols_dir != '', 'Could not get pkgdatadir from wayland-protocols.pc')
 
 foreach p: wayland_protocols
-  protocol_name = p.get(0)
+  stability = p.get(0)
+  name = p.get(1)
 
-  output_base = protocol_name
-  input = join_paths(protocols_dir,
-                     'stable/@0@/@0@.xml'.format(protocol_name))
+  assert(stability in ['stable', 'unstable'],
+         'protocol \'@0@\' must be \'stable\' or \'unstable\''.format(name))
+
+  suffix = stability=='unstable' ? '-unstable-v@0@'.format(p.get(2)) : ''
+
+  output_base = name
+  input = join_paths(protocols_dir, stability, name, name+suffix+'.xml')
 
   libdecoration_built_sources += custom_target('@0@ client header'.format(output_base),
     input: input,
