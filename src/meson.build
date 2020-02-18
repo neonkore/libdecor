@@ -1,3 +1,5 @@
+pkg = import('pkgconfig')
+
 libdecoration_includepath = include_directories('.')
 
 libdecoration_includes = [
@@ -78,3 +80,9 @@ libdecoration_dep = declare_dependency(
 )
 
 subdir('plugins')
+
+pkg.generate(
+  name: 'decoration',
+  description: 'library for Wayland client-side window decorations',
+  libraries: libdecoration,
+  version: meson.project_version())
