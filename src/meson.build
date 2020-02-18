@@ -28,6 +28,7 @@ wayland_scanner = find_program('wayland-scanner')
 #  - optional: protocol version, if unstable
 wayland_protocols = [
   ['stable', 'xdg-shell'],
+  ['unstable', 'xdg-decoration', '1'],
 ]
 
 protocols_dir = wayland_protocols_dep.get_pkgconfig_variable('pkgdatadir')
