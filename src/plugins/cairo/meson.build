@@ -16,6 +16,6 @@ shared_module('decoration-cairo',
     cairo_dep,
     wayland_cursor_dep,
   ],
-  install_dir: join_paths(plugindir, 'cairo'),
+  install_dir: join_paths(plugindir),
   install: true,
 )
