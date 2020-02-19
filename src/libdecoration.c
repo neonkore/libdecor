@@ -39,6 +39,7 @@
 #include "utils.h"
 
 #include "xdg-shell-client-protocol.h"
+#include "xdg-decoration-client-protocol.h"
 
 struct libdecor {
 	int ref_count;
@@ -51,6 +52,7 @@ struct libdecor {
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
 	struct xdg_wm_base *xdg_wm_base;
+	struct zxdg_decoration_manager_v1 *decoration_manager;
 
 	struct wl_callback *init_callback;
 	bool init_done;
@@ -87,6 +89,7 @@ struct libdecor_frame_private {
 
 	struct xdg_surface *xdg_surface;
 	struct xdg_toplevel *xdg_toplevel;
+	struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
 
 	bool pending_map;
 
@@ -110,6 +113,8 @@ struct libdecor_frame_private {
 	/* stored dimensions of the floating state */
 	int floating_width;
 	int floating_height;
+
+	enum zxdg_toplevel_decoration_v1_mode decoration_mode;
 };
 
 static void
@@ -350,6 +355,20 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 };
 
 static void
+toplevel_decoration_configure(
+		void *data,
+		struct zxdg_toplevel_decoration_v1 *zxdg_toplevel_decoration_v1,
+		uint32_t mode)
+{
+	((struct libdecor_frame_private *)(data))->decoration_mode = mode;
+}
+
+static const struct zxdg_toplevel_decoration_v1_listener
+		xdg_toplevel_decoration_listener = {
+	toplevel_decoration_configure,
+};
+
+static void
 init_shell_surface(struct libdecor_frame *frame)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
@@ -367,6 +386,20 @@ init_shell_surface(struct libdecor_frame *frame)
 	xdg_toplevel_add_listener(frame_priv->xdg_toplevel,
 				  &xdg_toplevel_listener,
 				  frame);
+
+	frame_priv->decoration_mode =
+			ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+	if (context->decoration_manager) {
+		frame_priv->toplevel_decoration =
+			zxdg_decoration_manager_v1_get_toplevel_decoration(
+					context->decoration_manager,
+					frame_priv->xdg_toplevel);
+
+		zxdg_toplevel_decoration_v1_add_listener(
+					frame_priv->toplevel_decoration,
+					&xdg_toplevel_decoration_listener,
+					frame_priv);
+	}
 
 	if (frame_priv->state.parent) {
 		xdg_toplevel_set_parent(frame_priv->xdg_toplevel,
@@ -674,7 +707,14 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 
 	libdecor_frame_apply_state(frame, state, configuration);
 
-	plugin->iface->frame_commit(plugin, frame, state, configuration);
+	switch (frame_priv->decoration_mode) {
+	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
+		plugin->iface->frame_commit(plugin, frame, state, configuration);
+		break;
+	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE:
+		plugin->iface->frame_free(plugin, frame);
+		break;
+	}
 
 	if (configuration) {
 		xdg_surface_ack_configure(frame_priv->xdg_surface,
@@ -781,6 +821,10 @@ registry_handle_global(void *user_data,
 
 	if (strcmp(interface, "xdg_wm_base") == 0)
 		init_xdg_wm_base(context, id, version);
+	else if (!strcmp(interface, zxdg_decoration_manager_v1_interface.name))
+		context->decoration_manager = wl_registry_bind(
+				context->wl_registry, id,
+				&zxdg_decoration_manager_v1_interface, version);
 }
 
 static void
@@ -965,6 +1009,9 @@ libdecor_unref(struct libdecor *context)
 		wl_registry_destroy(context->wl_registry);
 		if (context->xdg_wm_base)
 			xdg_wm_base_destroy(context->xdg_wm_base);
+		if (context->decoration_manager)
+			zxdg_decoration_manager_v1_destroy(
+						context->decoration_manager);
 		free(context);
 	}
 }

@@ -271,6 +271,8 @@ free_border_component(struct border_component *border_component)
 	}
 	if (border_component->buffer)
 		buffer_free(border_component->buffer);
+
+	border_component->buffer = NULL;
 }
 
 static void
@@ -551,11 +553,6 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 
 	old_decoration_type = frame_cairo->decoration_type;
 	new_decoration_type = window_state_to_decoration_type(new_window_state);
-
-	if (old_decoration_type == new_decoration_type &&
-	    old_content_width == new_content_width &&
-	    old_content_height == new_content_height)
-		return;
 
 	frame_cairo->content_width = new_content_width;
 	frame_cairo->content_height = new_content_height;
