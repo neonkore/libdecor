@@ -963,6 +963,8 @@ libdecor_unref(struct libdecor *context)
 		if (context->init_callback)
 			wl_callback_destroy(context->init_callback);
 		wl_registry_destroy(context->wl_registry);
+		if (context->xdg_wm_base)
+			xdg_wm_base_destroy(context->xdg_wm_base);
 		free(context);
 	}
 }
