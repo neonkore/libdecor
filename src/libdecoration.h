@@ -40,7 +40,7 @@ extern "C" {
 #define LIBDECOR_EXPORT
 #endif
 
-struct xdg_toplevel *parent;
+struct xdg_toplevel;
 
 struct libdecor;
 struct libdecor_frame;
