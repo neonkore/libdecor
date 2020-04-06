@@ -77,6 +77,10 @@ struct libdecor_plugin_description {
 struct libdecor_plugin_interface {
 	void (* destroy)(struct libdecor_plugin *plugin);
 
+	int (* get_fd)(struct libdecor_plugin *plugin);
+	int (* dispatch)(struct libdecor_plugin *plugin,
+			 int timeout);
+
 	struct libdecor_frame * (* frame_new)(struct libdecor_plugin *plugin);
 	void (* frame_free)(struct libdecor_plugin *plugin,
 			    struct libdecor_frame *frame);

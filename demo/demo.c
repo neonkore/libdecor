@@ -804,7 +804,7 @@ main(int argc,
 	libdecor_frame_set_title(window->frame, "libdecor demo");
 	libdecor_frame_map(window->frame);
 
-	while (wl_display_dispatch(wl_display) != -1);
+	while (libdecor_dispatch(context, -1) >= 0);
 
 	free(window);
 

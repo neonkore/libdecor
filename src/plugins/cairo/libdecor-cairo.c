@@ -27,6 +27,7 @@
 
 #include <linux/input.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -431,6 +432,59 @@ libdecor_frame_cairo_new(struct libdecor_plugin_cairo *plugin_cairo)
 	blur_surface(frame_cairo->shadow_blur, 64);
 
 	return frame_cairo;
+}
+
+static int
+libdecor_plugin_cairo_get_fd(struct libdecor_plugin *plugin)
+{
+	struct libdecor_plugin_cairo *plugin_cairo =
+		(struct libdecor_plugin_cairo *) plugin;
+	struct wl_display *wl_display =
+		libdecor_get_wl_display(plugin_cairo->context);
+
+	return wl_display_get_fd(wl_display);
+}
+
+static int
+libdecor_plugin_cairo_dispatch(struct libdecor_plugin *plugin,
+			       int timeout)
+{
+	struct libdecor_plugin_cairo *plugin_cairo =
+		(struct libdecor_plugin_cairo *) plugin;
+	struct wl_display *wl_display =
+		libdecor_get_wl_display(plugin_cairo->context);
+	struct pollfd fds[1];
+	int ret;
+	int dispatch_count = 0;
+
+	while (wl_display_prepare_read(wl_display) != 0)
+		dispatch_count += wl_display_dispatch_pending(wl_display);
+
+	if (wl_display_flush(wl_display) < 0 &&
+	    errno != EAGAIN) {
+		wl_display_cancel_read(wl_display);
+		return -errno;
+	}
+
+	fds[0] = (struct pollfd) { wl_display_get_fd(wl_display), POLLIN };
+
+	ret = poll(fds, ARRAY_SIZE (fds), timeout);
+	if (ret > 0) {
+		if (fds[0].revents & POLLIN) {
+			wl_display_read_events(wl_display);
+			dispatch_count += wl_display_dispatch_pending(wl_display);
+			return dispatch_count;
+		} else {
+			wl_display_cancel_read(wl_display);
+			return dispatch_count;
+		}
+	} else if (ret == 0) {
+		wl_display_cancel_read(wl_display);
+		return dispatch_count;
+	} else {
+		wl_display_cancel_read(wl_display);
+		return -errno;
+	}
 }
 
 static struct libdecor_frame *
@@ -1644,6 +1698,8 @@ libdecor_plugin_cairo_configuration_get_content_size(
 
 static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.destroy = libdecor_plugin_cairo_destroy,
+	.get_fd = libdecor_plugin_cairo_get_fd,
+	.dispatch = libdecor_plugin_cairo_dispatch,
 
 	.frame_new = libdecor_plugin_cairo_frame_new,
 	.frame_free = libdecor_plugin_cairo_frame_free,

@@ -1194,6 +1194,23 @@ retry_next:
 	return 0;
 }
 
+LIBDECOR_EXPORT int
+libdecor_get_fd(struct libdecor *context)
+{
+	struct libdecor_plugin *plugin = context->plugin;
+
+	return plugin->iface->get_fd(plugin);
+}
+
+LIBDECOR_EXPORT int
+libdecor_dispatch(struct libdecor *context,
+		  int timeout)
+{
+	struct libdecor_plugin *plugin = context->plugin;
+
+	return plugin->iface->dispatch(plugin, timeout);
+}
+
 LIBDECOR_EXPORT struct wl_display *
 libdecor_get_wl_display(struct libdecor *context)
 {

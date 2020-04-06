@@ -105,6 +105,13 @@ struct libdecor *
 libdecor_new(struct wl_display *display,
 	     struct libdecor_interface *iface);
 
+int
+libdecor_get_fd(struct libdecor *context);
+
+int
+libdecor_dispatch(struct libdecor *context,
+		  int timeout);
+
 struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,
 		  struct wl_surface *surface,

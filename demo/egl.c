@@ -258,6 +258,7 @@ main(int argc, char *argv[])
 	struct libdecor *context;
 	struct window *window;
 	struct client *client;
+	int ret = EXIT_SUCCESS;
 
 	client = calloc(1, sizeof(struct client));
 
@@ -290,16 +291,23 @@ main(int argc, char *argv[])
 
 	/* wait for the first configure event */
 	while (!window->configured) {
-		wl_display_dispatch(client->display);
+		if (libdecor_dispatch(context, 0) < 0) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
 	}
 
 	while (window->open) {
-		wl_display_dispatch_pending(client->display);
+		if (libdecor_dispatch(context, 0) < 0) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
 		draw(window);
 	}
 
+out:
 	free(window);
 	free(client);
 
-	return EXIT_SUCCESS;
+	return ret;
 }

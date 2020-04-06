@@ -35,6 +35,10 @@
 #define ARRAY_LENGTH(a) (sizeof (a) / sizeof (a)[0])
 #endif
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#endif
+
 static inline void *
 zalloc(size_t size)
 {
