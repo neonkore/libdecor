@@ -819,7 +819,7 @@ registry_handle_global(void *user_data,
 {
 	struct libdecor *context = user_data;
 
-	if (strcmp(interface, "xdg_wm_base") == 0)
+	if (!strcmp(interface, xdg_wm_base_interface.name))
 		init_xdg_wm_base(context, id, version);
 	else if (!strcmp(interface, zxdg_decoration_manager_v1_interface.name))
 		context->decoration_manager = wl_registry_bind(
