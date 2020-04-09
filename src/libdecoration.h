@@ -86,6 +86,7 @@ struct libdecor_frame_interface {
 			   void *user_data);
 	void (* close)(struct libdecor_frame *frame,
 		       void *user_data);
+	void (* commit)(void *user_data);
 };
 
 struct libdecor *
@@ -146,6 +147,9 @@ void
 libdecor_frame_move(struct libdecor_frame *frame,
 		    struct wl_seat *wl_seat,
 		    uint32_t serial);
+
+void
+libdecor_frame_toplevel_commit(struct libdecor_frame *frame);
 
 void
 libdecor_frame_commit(struct libdecor_frame *frame,

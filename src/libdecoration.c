@@ -697,6 +697,13 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
+libdecor_frame_toplevel_commit(struct libdecor_frame *frame)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	frame_priv->iface->commit(frame_priv->user_data);
+}
+
+LIBDECOR_EXPORT void
 libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_state *state,
 		      struct libdecor_configuration *configuration)

@@ -388,9 +388,16 @@ handle_close(struct libdecor_frame *frame,
 	exit(EXIT_SUCCESS);
 }
 
+static void
+handle_commit(void *user_data)
+{
+	wl_surface_commit(window->wl_surface);
+}
+
 static struct libdecor_frame_interface libdecor_frame_iface = {
 	handle_configure,
 	handle_close,
+	handle_commit,
 };
 
 static void
