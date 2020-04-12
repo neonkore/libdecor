@@ -162,7 +162,8 @@ void
 libdecor_frame_unset_maximized(struct libdecor_frame *frame);
 
 void
-libdecor_frame_set_fullscreen(struct libdecor_frame *frame);
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame,
+			      struct wl_output *output);
 
 void
 libdecor_frame_unset_fullscreen(struct libdecor_frame *frame);

@@ -629,9 +629,10 @@ libdecor_frame_unset_maximized(struct libdecor_frame *frame)
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_set_fullscreen(struct libdecor_frame *frame)
+libdecor_frame_set_fullscreen(struct libdecor_frame *frame,
+			      struct wl_output *output)
 {
-	xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, NULL);
+	xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, output);
 }
 
 LIBDECOR_EXPORT void
