@@ -426,6 +426,12 @@ main(int argc,
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
 	struct libdecor *context;
+	char *plugin_path;
+
+	if (asprintf(&plugin_path, "%s/%s",
+		     libdecor_get_default_plugin_dir(),
+		     "libdecoration-cairo.so") == -1)
+		return EXIT_FAILURE;
 
 	wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
@@ -450,8 +456,9 @@ main(int argc,
 	window->wl_surface = wl_compositor_create_surface(wl_compositor);
 
 	context = libdecor_new(wl_display, &libdecor_iface);
-	window->frame = libdecor_decorate(context, window->wl_surface,
-					  &libdecor_frame_iface, window);
+	window->frame = libdecor_decorate_custom(context, window->wl_surface,
+						 &libdecor_frame_iface, window,
+						 plugin_path);
 	libdecor_frame_set_app_id(window->frame, "libdecoration-demo");
 	libdecor_frame_set_title(window->frame, "libdecoration demo");
 	libdecor_frame_map(window->frame);

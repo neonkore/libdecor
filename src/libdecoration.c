@@ -31,7 +31,6 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
 
 #include "libdecoration.h"
 #include "libdecoration-fallback.h"
@@ -119,6 +118,60 @@ struct libdecor_frame_private {
 
 static void
 do_map(struct libdecor_frame *frame);
+
+bool
+is_valid_plugin(const char *path)
+{
+	void *lib;
+
+	lib = dlopen(path, RTLD_NOW | RTLD_LAZY);
+	if (!lib)
+		return false;
+
+	if (!dlsym(lib, "libdecor_plugin_new")) {
+		dlclose(lib);
+		return false;
+	}
+
+	dlclose(lib);
+
+	return true;
+}
+
+static struct libdecor_plugin *
+load_plugin(struct libdecor *context,
+	    const char *path)
+{
+	void *lib;
+	libdecor_plugin_constructor libdecor_plugin_constructor;
+	struct libdecor_plugin *plugin;
+
+	lib = dlopen(path, RTLD_NOW | RTLD_LAZY);
+	if (!lib) {
+		fprintf(stderr, "Failed to load plugin: '%s'\n", dlerror());
+		return NULL;
+	}
+
+	libdecor_plugin_constructor = dlsym(lib, "libdecor_plugin_new");
+	if (!libdecor_plugin_constructor) {
+		dlclose(lib);
+		fprintf(stderr,
+			"Failed to load plugin '%s': no constructor symbol\n",
+			path);
+		return NULL;
+	}
+
+	plugin = libdecor_plugin_constructor(context);
+	if (!plugin) {
+		dlclose(lib);
+		fprintf(stderr,
+			"Failed to load plugin '%s': failed to init\n",
+			path);
+		return NULL;
+	}
+
+	return plugin;
+}
 
 LIBDECOR_EXPORT struct libdecor_state *
 libdecor_state_new(int width,
@@ -436,19 +489,31 @@ init_shell_surface(struct libdecor_frame *frame)
 }
 
 LIBDECOR_EXPORT struct libdecor_frame *
-libdecor_decorate(struct libdecor *context,
-		  struct wl_surface *wl_surface,
-		  struct libdecor_frame_interface *iface,
-		  void *user_data)
+libdecor_decorate_custom(struct libdecor *context,
+			 struct wl_surface *surface,
+			 struct libdecor_frame_interface *iface,
+			 void *user_data,
+			 const char *plugin_path)
 {
-	struct libdecor_plugin *plugin = context->plugin;
 	struct libdecor_frame *frame;
 	struct libdecor_frame_private *frame_priv;
+
+	if (plugin_path) {
+		context->plugin = load_plugin(context, plugin_path);
+		if (!context->plugin) {
+			fprintf(stderr, "Couldn't open plugin (%s): %s\n",
+				strerror(errno), plugin_path);
+			return NULL;
+		}
+	}
+	else {
+		context->plugin = libdecor_fallback_plugin_new(context);
+	}
 
 	if (context->has_error)
 		return NULL;
 
-	frame = plugin->iface->frame_new(plugin);
+	frame = context->plugin->iface->frame_new(context->plugin);
 	if (!frame)
 		return NULL;
 
@@ -458,7 +523,7 @@ libdecor_decorate(struct libdecor *context,
 	frame_priv->ref_count = 1;
 	frame_priv->context = context;
 
-	frame_priv->wl_surface = wl_surface;
+	frame_priv->wl_surface = surface;
 	frame_priv->iface = iface;
 	frame_priv->user_data = user_data;
 
@@ -468,6 +533,50 @@ libdecor_decorate(struct libdecor *context,
 		init_shell_surface(frame);
 
 	return frame;
+}
+
+LIBDECOR_EXPORT struct libdecor_frame *
+libdecor_decorate(struct libdecor *context,
+		  struct wl_surface *surface,
+		  struct libdecor_frame_interface *iface,
+		  void *user_data)
+{
+	const char *plugin_dir;
+	char *plugin_path = NULL;
+	DIR *dir;
+
+	plugin_dir = libdecor_get_default_plugin_dir();
+
+	dir = opendir(plugin_dir);
+
+	if (dir) {
+		while (true) {
+			struct dirent *de;
+
+			de = readdir(dir);
+			if (!de)
+				break;
+
+			free(plugin_path);
+			plugin_path = NULL;
+
+			if (asprintf(&plugin_path, "%s/%s",
+				     plugin_dir, de->d_name) == -1)
+				continue;
+
+			if (is_valid_plugin(plugin_path))
+				break;
+		}
+
+		closedir(dir);
+	}
+	else {
+		fprintf(stderr, "Couldn't open plugin directory: %s\n",
+			strerror(errno));
+	}
+
+	return libdecor_decorate_custom(context, surface,
+					iface, user_data, plugin_path);
 }
 
 LIBDECOR_EXPORT void
@@ -925,86 +1034,16 @@ static const struct wl_callback_listener init_wl_display_callback_listener = {
 	init_wl_display_callback
 };
 
-static struct libdecor_plugin *
-load_plugin(struct libdecor *context,
-	    const char *path,
-	    const char *name)
+LIBDECOR_EXPORT char *
+libdecor_get_default_plugin_dir()
 {
-	char *filename;
-	void *lib;
-	libdecor_plugin_constructor libdecor_plugin_constructor;
-	struct libdecor_plugin *plugin;
-
-	if (asprintf(&filename, "%s/%s", path, name) == -1)
-		return NULL;
-
-	lib = dlopen(filename, RTLD_NOW | RTLD_LAZY);
-	free(filename);
-	if (!lib) {
-		fprintf(stderr, "Failed to load plugin: '%s'\n", dlerror());
-		return NULL;
-	}
-
-	libdecor_plugin_constructor = dlsym(lib, "libdecor_plugin_new");
-	if (!libdecor_plugin_constructor) {
-		dlclose(lib);
-		fprintf(stderr,
-			"Failed to load plugin '%s': no constructor symbol\n",
-			name);
-		return NULL;
-	}
-
-	plugin = libdecor_plugin_constructor(context);
-	if (!plugin) {
-		dlclose(lib);
-		fprintf(stderr,
-			"Failed to load plugin '%s': failod to init\n",
-			name);
-		return NULL;
-	}
-
-	return plugin;
-}
-
-static int
-init_plugins(struct libdecor *context)
-{
-	const char *plugin_dir;
-	DIR *dir;
+	char *plugin_dir;
 
 	plugin_dir = getenv("LIBDECOR_PLUGIN_DIR");
 	if (!plugin_dir)
 		plugin_dir = LIBDECOR_PLUGIN_DIR;
 
-	dir = opendir(plugin_dir);
-	if (!dir) {
-		fprintf(stderr, "Couldn't open plugin directory: %s\n",
-			strerror(errno));
-		return -1;
-	}
-
-	while (true) {
-		struct dirent *de;
-		struct libdecor_plugin *plugin;
-
-		de = readdir(dir);
-		if (!de)
-			break;
-
-		plugin = load_plugin(context, plugin_dir, de->d_name);
-		if (plugin) {
-			fprintf(stderr, "Loaded plugin '%s'\n", de->d_name);
-			context->plugin = plugin;
-			break;
-		}
-	}
-
-	closedir(dir);
-
-	if (!context->plugin)
-		return -1;
-
-	return 0;
+	return plugin_dir;
 }
 
 LIBDECOR_EXPORT struct wl_display *
@@ -1073,12 +1112,6 @@ libdecor_new(struct wl_display *wl_display,
 				 context);
 
 	wl_list_init(&context->frames);
-
-	if (init_plugins(context) != 0) {
-		fprintf(stderr,
-			"No plugins found, falling back on no decorations\n");
-		context->plugin = libdecor_fallback_plugin_new(context);
-	}
 
 	wl_display_flush(wl_display);
 

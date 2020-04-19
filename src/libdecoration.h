@@ -97,10 +97,20 @@ libdecor_new(struct wl_display *display,
 	     struct libdecor_interface *iface);
 
 struct libdecor_frame *
+libdecor_decorate_custom(struct libdecor *context,
+			 struct wl_surface *surface,
+			 struct libdecor_frame_interface *iface,
+			 void *user_data,
+			 const char *plugin_path);
+
+struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,
 		  struct wl_surface *surface,
 		  struct libdecor_frame_interface *iface,
 		  void *user_data);
+
+char *
+libdecor_get_default_plugin_dir();
 
 void
 libdecor_frame_ref(struct libdecor_frame *frame);
