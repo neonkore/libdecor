@@ -98,12 +98,21 @@ struct libdecor_frame_interface {
 	void (* commit)(void *user_data);
 };
 
+typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *);
+
 void
 libdecor_unref(struct libdecor *context);
 
 struct libdecor *
 libdecor_new(struct wl_display *display,
 	     struct libdecor_interface *iface);
+
+struct libdecor_frame *
+libdecor_decorate_custom(struct libdecor *context,
+			 struct wl_surface *surface,
+			 struct libdecor_frame_interface *iface,
+			 void *user_data,
+			 const libdecor_plugin_constructor plugin_constructor);
 
 struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,

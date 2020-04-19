@@ -43,8 +43,6 @@ struct libdecor_plugin {
 	struct libdecor_plugin_private *private;
 };
 
-typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *context);
-
 struct libdecor_plugin_interface {
 	void (* destroy)(struct libdecor_plugin *plugin);
 
