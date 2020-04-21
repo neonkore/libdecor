@@ -431,7 +431,6 @@ main(int argc,
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
 	struct libdecor *context;
-	int ret = 0;
 
 	wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
@@ -462,8 +461,7 @@ main(int argc,
 	libdecor_frame_set_title(window->frame, "libdecoration demo");
 	libdecor_frame_map(window->frame);
 
-	while (ret != -1)
-		ret = wl_display_dispatch(wl_display);
+	while (wl_display_dispatch(wl_display) != -1);
 
 	return EXIT_SUCCESS;
 }
