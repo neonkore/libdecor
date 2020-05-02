@@ -10,9 +10,11 @@ add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
 wayland_client_req = '>= 1.18'
 wayland_protocols_req = '>= 1.15'
+dbus_req = '>= 1.0'
 
 wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
 wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protocols_req)
+dbus_dep = dependency('dbus-1', version: dbus_req)
 dl_dep = cc.find_library('dl', required: true)
 
 # list of (function, prefix)

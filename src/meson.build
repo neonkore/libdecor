@@ -66,6 +66,18 @@ foreach p: wayland_protocols
   )
 endforeach
 
+## cursor settings
+cursor_settings = static_library('cursor_settings',
+  sources: ['cursor-settings.c'],
+  dependencies: [dbus_dep],
+)
+
+cursor_settings_dep = declare_dependency(
+  link_with: cursor_settings,
+  dependencies: [dbus_dep],
+)
+
+## core decoration library
 libdecoration = shared_library('decoration',
   sources: [
     libdecoration_sources,
@@ -76,6 +88,7 @@ libdecoration = shared_library('decoration',
   dependencies: [
     wayland_client_dep,
     dl_dep,
+    cursor_settings_dep,
   ],
   install: true
 )
@@ -87,8 +100,10 @@ libdecoration_dep = declare_dependency(
   ],
 )
 
+## decoration plugins
 subdir('plugins')
 
+## pkg-config file
 pkg.generate(
   name: 'decoration',
   description: 'library for Wayland client-side window decorations',

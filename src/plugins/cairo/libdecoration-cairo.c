@@ -36,6 +36,7 @@
 
 #include "libdecoration-plugin.h"
 #include "utils.h"
+#include "cursor-settings.h"
 
 #include "xdg-shell-client-protocol.h"
 
@@ -178,6 +179,8 @@ struct libdecor_plugin_cairo {
 	bool has_argb;
 
 	struct wl_cursor_theme *cursor_theme;
+	char *cursor_theme_name;
+	int cursor_size;
 
 	struct wl_cursor *cursors[8]; /* resize edges and corners */
 
@@ -1079,8 +1082,10 @@ ensure_cursor_surface(struct seat *seat)
 static void
 ensure_cursor_theme(struct libdecor_plugin_cairo *plugin_cairo)
 {
-	plugin_cairo->cursor_theme =
-		wl_cursor_theme_load(NULL, 24, plugin_cairo->wl_shm);
+	plugin_cairo->cursor_theme = wl_cursor_theme_load(
+					     plugin_cairo->cursor_theme_name,
+					     plugin_cairo->cursor_size,
+					     plugin_cairo->wl_shm);
 
 	for (int i = 0; i <= 8; i++) {
 		plugin_cairo->cursors[i] = wl_cursor_theme_get_cursor(
@@ -1487,6 +1492,13 @@ libdecor_plugin_new(struct libdecor *context)
 	plugin_cairo = zalloc(sizeof *plugin_cairo);
 	plugin_cairo->plugin.iface = &cairo_plugin_iface;
 	plugin_cairo->context = context;
+
+	/* fetch cursor theme and size*/
+	if (!libdecor_get_cursor_settings(&plugin_cairo->cursor_theme_name,
+					  &plugin_cairo->cursor_size)) {
+		plugin_cairo->cursor_theme_name = NULL;
+		plugin_cairo->cursor_size = 24;
+	}
 
 	wl_display = libdecor_get_wl_display(context);
 	plugin_cairo->wl_registry = wl_display_get_registry(wl_display);

@@ -39,6 +39,7 @@
 
 #include "libdecoration.h"
 #include "utils.h"
+#include "cursor-settings.h"
 
 #define DEFAULT_WIDTH 800
 #define DEFAULT_HEIGHT 600
@@ -403,7 +404,15 @@ static struct libdecor_frame_interface libdecor_frame_iface = {
 static void
 init_cursors(void)
 {
-	cursor_theme = wl_cursor_theme_load(NULL, 24, wl_shm);
+	char *theme;
+	int size;
+
+	if (!libdecor_get_cursor_settings(&theme, &size)) {
+		theme = NULL;
+		size = 24;
+	}
+
+	cursor_theme = wl_cursor_theme_load(theme, size, wl_shm);
 	left_ptr_cursor = wl_cursor_theme_get_cursor(cursor_theme, "left_ptr");
 	cursor_surface = wl_compositor_create_surface(wl_compositor);
 }

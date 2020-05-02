@@ -8,6 +8,6 @@ executable('libdecor-demo',
     top_includepath,
     libdecoration_includepath,
   ],
-  dependencies: [libdecoration_dep, wayland_cursor_dep],
+  dependencies: [libdecoration_dep, wayland_cursor_dep, cursor_settings_dep],
   install: false,
 )
