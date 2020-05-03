@@ -941,6 +941,7 @@ load_plugin(struct libdecor *context,
 	lib = dlopen(filename, RTLD_NOW | RTLD_LAZY);
 	free(filename);
 	if (!lib) {
+		fprintf(stderr, "Failed to load plugin: '%s'\n", dlerror());
 		return NULL;
 	}
 
