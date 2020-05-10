@@ -15,14 +15,15 @@ wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
 wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protocols_req)
 dl_dep = cc.find_library('dl', required: true)
 
+# list of (function, prefix)
 required_functions = [
-  'memfd_create',
-  'posix_fallocate',
-  'asprintf',
+  ['memfd_create', '#define _GNU_SOURCE\n#include <sys/mman.h>'],
+  ['posix_fallocate', '#include <fcntl.h>'],
+  ['asprintf', '#define _GNU_SOURCE\n#include <stdio.h>'],
 ]
 foreach function : required_functions
-  if not cc.has_function(function)
-    error('Required function ' + function + ' missing')
+  if not cc.has_function(function[0], prefix: function[1])
+    error('Required function ' + function[0] + ' missing')
   endif
 endforeach
 
