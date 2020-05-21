@@ -107,7 +107,7 @@ libdecor_frame_unref(struct libdecor_frame *frame);
 
 void
 libdecor_frame_set_parent(struct libdecor_frame *frame,
-			  struct xdg_toplevel *parent);
+			  struct libdecor_frame *parent);
 
 void
 libdecor_frame_set_title(struct libdecor_frame *frame,

@@ -489,16 +489,17 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 
 LIBDECOR_EXPORT void
 libdecor_frame_set_parent(struct libdecor_frame *frame,
-			  struct xdg_toplevel *parent)
+			  struct libdecor_frame *parent)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
-
-	frame_priv->state.parent = parent;
 
 	if (!frame_priv->xdg_toplevel)
 		return;
 
-	xdg_toplevel_set_parent(frame_priv->xdg_toplevel, parent);
+	frame_priv->state.parent = parent->priv->xdg_toplevel;
+
+	xdg_toplevel_set_parent(frame_priv->xdg_toplevel,
+				parent->priv->xdg_toplevel);
 }
 
 LIBDECOR_EXPORT void
