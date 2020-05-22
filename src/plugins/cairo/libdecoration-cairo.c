@@ -58,6 +58,17 @@ static const uint32_t COL_SYM_ACT = 0xFF20322A;
 
 static const uint32_t DOUBLE_CLICK_TIME_MS = 400;
 
+static const char *cursor_names[] = {
+	"top_side",
+	"bottom_side",
+	"left_side",
+	"top_left_corner",
+	"bottom_left_corner",
+	"right_side",
+	"top_right_corner",
+	"bottom_right_corner"
+};
+
 
 /* color conversion function from 32bit integer to double components */
 
@@ -182,20 +193,10 @@ struct libdecor_plugin_cairo {
 	char *cursor_theme_name;
 	int cursor_size;
 
-	struct wl_cursor *cursors[8]; /* resize edges and corners */
+	/* cursors for resize edges and corners */
+	struct wl_cursor *cursors[ARRAY_LENGTH(cursor_names)];
 
 	struct wl_cursor *cursor_left_ptr;
-};
-
-static const char* cursor_names[] = {
-	"top_side",
-	"bottom_side",
-	"left_side",
-	"top_left_corner",
-	"bottom_left_corner",
-	"right_side",
-	"top_right_corner",
-	"bottom_right_corner"
 };
 
 static const char *libdecoration_cairo_proxy_tag = "libdecoration-cairo";
@@ -1082,12 +1083,13 @@ ensure_cursor_surface(struct seat *seat)
 static void
 ensure_cursor_theme(struct libdecor_plugin_cairo *plugin_cairo)
 {
-	plugin_cairo->cursor_theme = wl_cursor_theme_load(
-					     plugin_cairo->cursor_theme_name,
-					     plugin_cairo->cursor_size,
-					     plugin_cairo->wl_shm);
+	if (!plugin_cairo->cursor_theme)
+		plugin_cairo->cursor_theme = wl_cursor_theme_load(
+						     plugin_cairo->cursor_theme_name,
+						     plugin_cairo->cursor_size,
+						     plugin_cairo->wl_shm);
 
-	for (int i = 0; i <= 8; i++) {
+	for (unsigned int i = 0; i < ARRAY_LENGTH(cursor_names); i++) {
 		plugin_cairo->cursors[i] = wl_cursor_theme_get_cursor(
 						   plugin_cairo->cursor_theme,
 						   cursor_names[i]);
@@ -1498,6 +1500,7 @@ libdecor_plugin_new(struct libdecor *context)
 	plugin_cairo = zalloc(sizeof *plugin_cairo);
 	plugin_cairo->plugin.iface = &cairo_plugin_iface;
 	plugin_cairo->context = context;
+	plugin_cairo->cursor_theme = NULL;
 
 	/* fetch cursor theme and size*/
 	if (!libdecor_get_cursor_settings(&plugin_cairo->cursor_theme_name,

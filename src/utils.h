@@ -31,6 +31,10 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+#ifndef ARRAY_LENGTH
+#define ARRAY_LENGTH(a) (sizeof (a) / sizeof (a)[0])
+#endif
+
 static inline void *
 zalloc(size_t size)
 {
