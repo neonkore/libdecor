@@ -381,8 +381,10 @@ free_border_component(struct border_component *border_component)
 		wl_surface_destroy(border_component->wl_surface);
 		border_component->wl_surface = NULL;
 	}
-	if (border_component->buffer)
+	if (border_component->buffer) {
 		buffer_free(border_component->buffer);
+		border_component->buffer = NULL;
+	}
 }
 
 static void
@@ -392,7 +394,15 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	struct libdecor_frame_cairo *frame_cairo =
 		(struct libdecor_frame_cairo *) frame;
 
+	free_border_component(&frame_cairo->title_bar.title);
+	free_border_component(&frame_cairo->title_bar.min);
+	free_border_component(&frame_cairo->title_bar.max);
+	free_border_component(&frame_cairo->title_bar.close);
 	free_border_component(&frame_cairo->shadow);
+	if (frame_cairo->shadow_blur != NULL) {
+		cairo_surface_destroy(frame_cairo->shadow_blur);
+		frame_cairo->shadow_blur = NULL;
+	}
 }
 
 static bool
