@@ -478,10 +478,17 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 		struct libdecor *context = frame_priv->context;
 		struct libdecor_plugin *plugin = context->plugin;
 
+		if (frame_priv->xdg_toplevel)
+			xdg_toplevel_destroy(frame_priv->xdg_toplevel);
+		if (frame_priv->xdg_surface)
+			xdg_surface_destroy(frame_priv->xdg_surface);
+
 		plugin->iface->frame_free(plugin, frame);
 
 		free(frame_priv->state.title);
 		free(frame_priv->state.app_id);
+
+		free(frame_priv);
 
 		free(frame);
 	}
