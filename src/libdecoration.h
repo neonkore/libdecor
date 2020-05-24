@@ -89,6 +89,9 @@ struct libdecor_frame_interface {
 	void (* commit)(void *user_data);
 };
 
+void
+libdecor_unref(struct libdecor *context);
+
 struct libdecor *
 libdecor_new(struct wl_display *display,
 	     struct libdecor_interface *iface);
