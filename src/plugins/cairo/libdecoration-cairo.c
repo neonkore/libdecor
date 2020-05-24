@@ -1190,6 +1190,9 @@ pointer_enter(void *data,
 	      wl_fixed_t surface_x,
 	      wl_fixed_t surface_y)
 {
+	if (!surface)
+		return;
+
 	struct seat *seat = data;
 	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
 	struct libdecor_frame_cairo *frame_cairo;
@@ -1243,6 +1246,9 @@ pointer_leave(void *data,
 	      uint32_t serial,
 	      struct wl_surface *surface)
 {
+	if (!surface)
+		return;
+
 	struct seat *seat = data;
 	struct libdecor_frame_cairo *frame_cairo;
 
