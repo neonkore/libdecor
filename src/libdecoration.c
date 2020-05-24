@@ -1025,6 +1025,8 @@ libdecor_unref(struct libdecor *context)
 {
 	context->ref_count--;
 	if (context->ref_count == 0) {
+		if (context->plugin)
+			context->plugin->iface->destroy(context->plugin);
 		if (context->init_callback)
 			wl_callback_destroy(context->init_callback);
 		wl_registry_destroy(context->wl_registry);

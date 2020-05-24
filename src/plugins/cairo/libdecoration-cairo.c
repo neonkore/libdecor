@@ -127,6 +127,8 @@ struct seat {
 	uint32_t pointer_button_time_stamp;
 
 	uint32_t serial;
+
+	struct wl_list link;
 };
 
 struct buffer {
@@ -189,6 +191,8 @@ struct libdecor_plugin_cairo {
 	struct wl_callback *shm_callback;
 	bool has_argb;
 
+	struct wl_list seat_list;
+
 	struct wl_cursor_theme *cursor_theme;
 	char *cursor_theme_name;
 	int cursor_size;
@@ -219,12 +223,32 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 {
 	struct libdecor_plugin_cairo *plugin_cairo =
 		(struct libdecor_plugin_cairo *) plugin;
+	struct seat *seat;
 
 	if (plugin_cairo->globals_callback)
 		wl_callback_destroy(plugin_cairo->globals_callback);
 	if (plugin_cairo->shm_callback)
 		wl_callback_destroy(plugin_cairo->shm_callback);
 	wl_registry_destroy(plugin_cairo->wl_registry);
+
+	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+		if (seat->wl_pointer)
+			wl_pointer_destroy(seat->wl_pointer);
+		if (seat->cursor_surface)
+			wl_surface_destroy(seat->cursor_surface);
+		wl_seat_destroy(seat->wl_seat);
+		free(seat);
+	}
+
+	if (plugin_cairo->cursor_theme)
+		wl_cursor_theme_destroy(plugin_cairo->cursor_theme);
+
+	wl_shm_destroy(plugin_cairo->wl_shm);
+
+	wl_compositor_destroy(plugin_cairo->wl_compositor);
+	wl_subcompositor_destroy(plugin_cairo->wl_subcompositor);
+
+	free(plugin_cairo);
 }
 
 static struct libdecor_frame_cairo *
@@ -1430,6 +1454,7 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 
 	seat = zalloc(sizeof *seat);
 	seat->plugin_cairo = plugin_cairo;
+	wl_list_insert(&plugin_cairo->seat_list, &seat->link);
 	seat->wl_seat =
 		wl_registry_bind(plugin_cairo->wl_registry,
 				 id, &wl_seat_interface, 1);
@@ -1511,6 +1536,8 @@ libdecor_plugin_new(struct libdecor *context)
 	plugin_cairo->plugin.iface = &cairo_plugin_iface;
 	plugin_cairo->context = context;
 	plugin_cairo->cursor_theme = NULL;
+
+	wl_list_init(&plugin_cairo->seat_list);
 
 	/* fetch cursor theme and size*/
 	if (!libdecor_get_cursor_settings(&plugin_cairo->cursor_theme_name,
