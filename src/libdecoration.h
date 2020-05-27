@@ -181,6 +181,9 @@ libdecor_frame_map(struct libdecor_frame *frame);
 struct xdg_surface *
 libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
 
+struct xdg_toplevel *
+libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame);
+
 struct libdecor_state *
 libdecor_state_new(int width,
 		   int height);

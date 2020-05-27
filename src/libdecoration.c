@@ -768,6 +768,12 @@ libdecor_frame_get_xdg_surface(struct libdecor_frame *frame)
 	return frame_priv->xdg_surface;
 }
 
+LIBDECOR_EXPORT struct xdg_toplevel *
+libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame)
+{
+	return frame->priv->xdg_toplevel;
+}
+
 LIBDECOR_EXPORT int
 libdecor_frame_get_content_width(struct libdecor_frame *frame)
 {
