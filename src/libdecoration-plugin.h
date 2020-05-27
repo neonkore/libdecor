@@ -66,9 +66,6 @@ struct libdecor_plugin_interface {
 struct wl_surface *
 libdecor_frame_get_wl_surface(struct libdecor_frame *frame);
 
-struct xdg_surface *
-libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
-
 int
 libdecor_frame_get_content_width(struct libdecor_frame *frame);
 
