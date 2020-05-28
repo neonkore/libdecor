@@ -896,6 +896,8 @@ init_wl_display_callback(void *user_data,
 	struct libdecor *context = user_data;
 
 	context->init_done = true;
+
+	wl_callback_destroy(callback);
 	context->init_callback = NULL;
 
 	if (!is_compositor_compatible(context)) {
