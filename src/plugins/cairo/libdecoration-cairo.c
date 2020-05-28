@@ -243,6 +243,8 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 	if (plugin_cairo->cursor_theme)
 		wl_cursor_theme_destroy(plugin_cairo->cursor_theme);
 
+	free(plugin_cairo->cursor_theme_name);
+
 	wl_shm_destroy(plugin_cairo->wl_shm);
 
 	wl_compositor_destroy(plugin_cairo->wl_compositor);

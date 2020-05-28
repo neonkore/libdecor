@@ -96,7 +96,6 @@ libdecor_get_cursor_settings(char **theme, int *size)
 		return false;
 	}
 
-	*theme = malloc(strlen(value_theme) * sizeof(char));
 	*theme = strdup(value_theme);
 
 	dbus_message_unref(reply);
