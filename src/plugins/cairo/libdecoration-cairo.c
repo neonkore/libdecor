@@ -180,6 +180,7 @@ struct libdecor_plugin_cairo {
 	struct libdecor_plugin plugin;
 
 	struct wl_callback *globals_callback;
+	struct wl_callback *globals_callback_shm;
 
 	struct libdecor *context;
 
@@ -227,6 +228,8 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 
 	if (plugin_cairo->globals_callback)
 		wl_callback_destroy(plugin_cairo->globals_callback);
+	if (plugin_cairo->globals_callback_shm)
+		wl_callback_destroy(plugin_cairo->globals_callback_shm);
 	if (plugin_cairo->shm_callback)
 		wl_callback_destroy(plugin_cairo->shm_callback);
 	wl_registry_destroy(plugin_cairo->wl_registry);
@@ -1071,6 +1074,9 @@ shm_callback(void *user_data,
 	struct libdecor_plugin_cairo *plugin_cairo = user_data;
 	struct libdecor *context = plugin_cairo->context;
 
+	wl_callback_destroy(callback);
+	plugin_cairo->globals_callback_shm = NULL;
+
 	if (!plugin_cairo->has_argb) {
 		libdecor_notify_plugin_error(
 				context,
@@ -1099,8 +1105,8 @@ init_wl_shm(struct libdecor_plugin_cairo *plugin_cairo,
 				 id, &wl_shm_interface, 1);
 	wl_shm_add_listener(plugin_cairo->wl_shm, &shm_listener, plugin_cairo);
 
-	plugin_cairo->globals_callback = wl_display_sync(wl_display);
-	wl_callback_add_listener(plugin_cairo->globals_callback,
+	plugin_cairo->globals_callback_shm = wl_display_sync(wl_display);
+	wl_callback_add_listener(plugin_cairo->globals_callback_shm,
 				 &shm_callback_listener,
 				 plugin_cairo);
 }
@@ -1513,6 +1519,9 @@ globals_callback(void *user_data,
 		 uint32_t time)
 {
 	struct libdecor_plugin_cairo *plugin_cairo = user_data;
+
+	wl_callback_destroy(callback);
+	plugin_cairo->globals_callback = NULL;
 
 	if (!has_required_globals(plugin_cairo)) {
 		struct libdecor *context = plugin_cairo->context;
