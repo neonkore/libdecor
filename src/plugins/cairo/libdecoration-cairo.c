@@ -449,6 +449,9 @@ is_title_bar_surfaces_showing(struct libdecor_frame_cairo *frame_cairo)
 static void
 hide_border_component(struct border_component *border_component)
 {
+	if (!border_component->wl_surface)
+		return;
+
 	wl_surface_attach(border_component->wl_surface, NULL, 0, 0);
 	wl_surface_commit(border_component->wl_surface);
 }
@@ -765,7 +768,7 @@ static void
 set_component_input_region(struct libdecor_frame_cairo *frame_cairo,
 			   struct border_component *border_component)
 {
-	if (border_component->type == SHADOW) {
+	if (border_component->type == SHADOW && frame_cairo->shadow_showing) {
 		struct wl_region *input_region;
 		int component_x;
 		int component_y;
