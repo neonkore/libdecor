@@ -415,6 +415,8 @@ init_cursors(void)
 	cursor_theme = wl_cursor_theme_load(theme, size, wl_shm);
 	left_ptr_cursor = wl_cursor_theme_get_cursor(cursor_theme, "left_ptr");
 	cursor_surface = wl_compositor_create_surface(wl_compositor);
+
+	free(theme);
 }
 
 int
