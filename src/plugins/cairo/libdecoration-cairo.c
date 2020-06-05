@@ -427,7 +427,9 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	free_border_component(&frame_cairo->title_bar.min);
 	free_border_component(&frame_cairo->title_bar.max);
 	free_border_component(&frame_cairo->title_bar.close);
+	frame_cairo->title_bar.is_showing = false;
 	free_border_component(&frame_cairo->shadow);
+	frame_cairo->shadow_showing = false;
 	if (frame_cairo->shadow_blur != NULL) {
 		cairo_surface_destroy(frame_cairo->shadow_blur);
 		frame_cairo->shadow_blur = NULL;
@@ -909,20 +911,20 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 	case DECORATION_TYPE_NONE:
 		x = 0;
 		y = 0;
-		width = frame_cairo->content_width;
-		height = frame_cairo->content_height;
+		width = libdecor_frame_get_content_width(frame);
+		height = libdecor_frame_get_content_height(frame);
 		break;
 	case DECORATION_TYPE_ALL:
 		x = 0;
 		y = -(int)TITLE_HEIGHT;
-		width = frame_cairo->content_width;
-		height = frame_cairo->content_height + TITLE_HEIGHT;
+		width = libdecor_frame_get_content_width(frame);
+		height = libdecor_frame_get_content_height(frame) + TITLE_HEIGHT;
 		break;
 	case DECORATION_TYPE_TITLE_ONLY:
 		x = 0;
 		y = -(int)TITLE_HEIGHT;
-		width = frame_cairo->content_width;
-		height = frame_cairo->content_height + TITLE_HEIGHT;
+		width = libdecor_frame_get_content_width(frame);
+		height = libdecor_frame_get_content_height(frame) + TITLE_HEIGHT;
 		break;
 	}
 
@@ -992,6 +994,10 @@ libdecor_plugin_cairo_configuration_get_content_size(
 		int *content_width,
 		int *content_height)
 {
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+	int title_bar_height;
+
 	int win_width, win_height;
 	if (!libdecor_configuration_get_window_size(configuration,
 						    &win_width,
@@ -1007,6 +1013,8 @@ libdecor_plugin_cairo_configuration_get_content_size(
 		return false;
 	}
 
+	title_bar_height = frame_cairo->title_bar.is_showing ? (int)TITLE_HEIGHT : 0;
+
 	switch (window_state_to_decoration_type(state)) {
 	case DECORATION_TYPE_NONE:
 		*content_width = win_width;
@@ -1014,11 +1022,11 @@ libdecor_plugin_cairo_configuration_get_content_size(
 		break;
 	case DECORATION_TYPE_ALL:
 		*content_width = win_width;
-		*content_height = win_height - TITLE_HEIGHT;
+		*content_height = win_height - title_bar_height;
 		break;
 	case DECORATION_TYPE_TITLE_ONLY:
 		*content_width = win_width;
-		*content_height = win_height - TITLE_HEIGHT;
+		*content_height = win_height - title_bar_height;
 		break;
 	}
 
