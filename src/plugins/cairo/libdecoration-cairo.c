@@ -517,10 +517,8 @@ ensure_component(struct libdecor_frame_cairo *frame_cairo,
 static void
 ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
-	if (frame_cairo->shadow.type == NONE) {
-		frame_cairo->shadow.type = SHADOW;
-		ensure_component(frame_cairo, &frame_cairo->shadow);
-	}
+	frame_cairo->shadow.type = SHADOW;
+	ensure_component(frame_cairo, &frame_cairo->shadow);
 
 	libdecor_frame_set_min_content_size(&frame_cairo->frame,
 					    MAX(56, 4 * BUTTON_WIDTH),
