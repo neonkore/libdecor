@@ -432,6 +432,8 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 		cairo_surface_destroy(frame_cairo->shadow_blur);
 		frame_cairo->shadow_blur = NULL;
 	}
+
+	frame_cairo->decoration_type = DECORATION_TYPE_NONE;
 }
 
 static bool
