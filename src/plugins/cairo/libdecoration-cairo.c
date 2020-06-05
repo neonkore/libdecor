@@ -530,14 +530,17 @@ ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 static void
 ensure_title_bar_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
-	ensure_component(frame_cairo, &frame_cairo->title_bar.title);
 	frame_cairo->title_bar.title.type = TITLE;
-	ensure_component(frame_cairo, &frame_cairo->title_bar.min);
+	ensure_component(frame_cairo, &frame_cairo->title_bar.title);
+
 	frame_cairo->title_bar.min.type = BUTTON_MIN;
-	ensure_component(frame_cairo, &frame_cairo->title_bar.max);
+	ensure_component(frame_cairo, &frame_cairo->title_bar.min);
+
 	frame_cairo->title_bar.max.type = BUTTON_MAX;
-	ensure_component(frame_cairo, &frame_cairo->title_bar.close);
+	ensure_component(frame_cairo, &frame_cairo->title_bar.max);
+
 	frame_cairo->title_bar.close.type = BUTTON_CLOSE;
+	ensure_component(frame_cairo, &frame_cairo->title_bar.close);
 }
 
 static void
