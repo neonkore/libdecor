@@ -15,6 +15,6 @@ executable('libdecor-demo',
 executable('libdecor-egl',
   sources: 'egl.c',
   include_directories: libdecoration_includepath,
-  dependencies: libdecoration_dep,
+  dependencies: [libdecoration_dep, wayland_egl_dep, egl_dep, gl_dep,],
   install: false,
 )
