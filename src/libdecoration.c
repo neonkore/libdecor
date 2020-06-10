@@ -165,11 +165,18 @@ window_size_to_content_size(struct libdecor_configuration *configuration,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	return plugin->iface->configuration_get_content_size(plugin,
-							     configuration,
-							     frame,
-							     content_width,
-							     content_height);
+	switch (frame_priv->decoration_mode) {
+	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
+		return plugin->iface->configuration_get_content_size(
+					plugin, configuration, frame,
+					content_width, content_height);
+	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE:
+		*content_width = configuration->window_width;
+		*content_height = configuration->window_height;
+		return true;
+	default:
+		return false;
+	}
 }
 
 LIBDECOR_EXPORT bool
