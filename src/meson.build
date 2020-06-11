@@ -78,7 +78,7 @@ cursor_settings_dep = declare_dependency(
 )
 
 ## core decoration library
-libdecoration = shared_library('decoration',
+libdecoration = both_libraries('decoration',
   sources: [
     libdecoration_sources,
     libdecoration_built_sources,
@@ -95,6 +95,13 @@ libdecoration = shared_library('decoration',
 
 libdecoration_dep = declare_dependency(
   link_with: libdecoration,
+  dependencies: [
+    wayland_client_dep,
+  ],
+)
+
+libdecoration_static_dep = declare_dependency(
+  link_with: libdecoration.get_static_lib(),
   dependencies: [
     wayland_client_dep,
   ],
