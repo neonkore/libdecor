@@ -374,6 +374,9 @@ init_shell_surface(struct libdecor_frame *frame)
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	struct libdecor *context = frame_priv->context;
 
+	if (frame_priv->xdg_surface)
+		return;
+
 	frame_priv->xdg_surface =
 		xdg_wm_base_get_xdg_surface(context->xdg_wm_base,
 					    frame_priv->wl_surface);
