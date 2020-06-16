@@ -153,6 +153,13 @@ void
 libdecor_frame_unref(struct libdecor_frame *frame);
 
 void
+libdecor_frame_set_visibility(struct libdecor_frame *frame,
+			      bool visible);
+
+bool
+libdecor_frame_is_visible(struct libdecor_frame *frame);
+
+void
 libdecor_frame_set_parent(struct libdecor_frame *frame,
 			  struct libdecor_frame *parent);
 

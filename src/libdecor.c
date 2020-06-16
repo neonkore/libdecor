@@ -126,6 +126,8 @@ struct libdecor_frame_private {
 
 	/* original limits for interactive resize */
 	struct libdecor_limits interactive_limits;
+
+	bool visible;
 };
 
 /* gather all states at which a window is non-floating */
@@ -148,6 +150,18 @@ static bool
 state_is_floating(enum libdecor_window_state window_state)
 {
 	return !(window_state & states_non_floating);
+}
+
+static bool
+frame_has_visible_client_side_decoration(struct libdecor_frame *frame)
+{
+	/* visibility by client configuration */
+	const bool vis_client = frame->priv->visible;
+	/* visibility by compositor configuration */
+	const bool vis_server = (frame->priv->decoration_mode ==
+				 ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+
+	return vis_client && vis_server;
 }
 
 LIBDECOR_EXPORT int
@@ -213,17 +227,14 @@ window_size_to_content_size(struct libdecor_configuration *configuration,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	switch (frame_priv->decoration_mode) {
-	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
+	if (frame_has_visible_client_side_decoration(frame)) {
 		return plugin->iface->configuration_get_content_size(
 					plugin, configuration, frame,
 					content_width, content_height);
-	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE:
+	} else {
 		*content_width = configuration->window_width;
 		*content_height = configuration->window_height;
 		return true;
-	default:
-		return false;
 	}
 }
 
@@ -418,6 +429,23 @@ static const struct zxdg_toplevel_decoration_v1_listener
 	toplevel_decoration_configure,
 };
 
+void
+libdecor_frame_create_xdg_decoration(struct libdecor_frame_private *frame_priv)
+{
+	if (!frame_priv->context->decoration_manager)
+		return;
+
+	frame_priv->toplevel_decoration =
+		zxdg_decoration_manager_v1_get_toplevel_decoration(
+				frame_priv->context->decoration_manager,
+				frame_priv->xdg_toplevel);
+
+	zxdg_toplevel_decoration_v1_add_listener(
+				frame_priv->toplevel_decoration,
+				&xdg_toplevel_decoration_listener,
+				frame_priv);
+}
+
 static void
 init_shell_surface(struct libdecor_frame *frame)
 {
@@ -442,17 +470,8 @@ init_shell_surface(struct libdecor_frame *frame)
 
 	frame_priv->decoration_mode =
 			ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-	if (context->decoration_manager) {
-		frame_priv->toplevel_decoration =
-			zxdg_decoration_manager_v1_get_toplevel_decoration(
-					context->decoration_manager,
-					frame_priv->xdg_toplevel);
-
-		zxdg_toplevel_decoration_v1_add_listener(
-					frame_priv->toplevel_decoration,
-					&xdg_toplevel_decoration_listener,
-					frame_priv);
-	}
+	frame_priv->toplevel_decoration = NULL;
+	libdecor_frame_create_xdg_decoration(frame_priv);
 
 	if (frame_priv->state.parent) {
 		xdg_toplevel_set_parent(frame_priv->xdg_toplevel,
@@ -507,6 +526,8 @@ libdecor_decorate(struct libdecor *context,
 					LIBDECOR_ACTION_FULLSCREEN |
 					LIBDECOR_ACTION_CLOSE);
 
+	frame_priv->visible = true;
+
 	if (context->init_done)
 		init_shell_surface(frame);
 
@@ -545,6 +566,58 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 
 		free(frame);
 	}
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_set_visibility(struct libdecor_frame *frame,
+			      bool visible)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	frame_priv->visible = visible;
+
+	/* enable/disable decorations that are managed by the compositor,
+	 * only xdg-decoration version 2 and above allows to toggle decoration */
+	if (context->decoration_manager &&
+	    zxdg_decoration_manager_v1_get_version(context->decoration_manager) > 1) {
+		if (frame_priv->visible &&
+		    frame_priv->toplevel_decoration == NULL) {
+			/* - request to SHOW decorations
+			 * - decorations are NOT HANDLED
+			 * => create new decorations for already mapped surface */
+			libdecor_frame_create_xdg_decoration(frame_priv);
+		} else if (!frame_priv->visible &&
+			 frame_priv->toplevel_decoration != NULL) {
+			/* - request to HIDE decorations
+			 * - decorations are HANDLED
+			 * => destroy decorations */
+			zxdg_toplevel_decoration_v1_destroy(frame_priv->toplevel_decoration);
+			frame_priv->toplevel_decoration = NULL;
+		}
+	}
+
+	/* enable/disable decorations that are managed by a plugin */
+	if (frame_has_visible_client_side_decoration(frame)) {
+		/* show client-side decorations */
+		plugin->iface->frame_commit(plugin, frame, NULL, NULL);
+	} else {
+		/* destroy client-side decorations */
+		plugin->iface->frame_free(plugin, frame);
+
+		libdecor_frame_set_window_geometry(frame, 0, 0,
+						   frame_priv->content_width,
+						   frame_priv->content_height);
+	}
+
+	libdecor_frame_toplevel_commit(frame);
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_is_visible(struct libdecor_frame *frame)
+{
+	return frame->priv->visible;
 }
 
 LIBDECOR_EXPORT void
@@ -997,13 +1070,15 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 
 	libdecor_frame_apply_state(frame, state);
 
-	switch (frame_priv->decoration_mode) {
-	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
+	/* switch between decoration modes */
+	if (frame_has_visible_client_side_decoration(frame)) {
 		plugin->iface->frame_commit(plugin, frame, state, configuration);
-		break;
-	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE:
+	} else {
 		plugin->iface->frame_free(plugin, frame);
-		break;
+
+		libdecor_frame_set_window_geometry(frame, 0, 0,
+						   frame_priv->content_width,
+						   frame_priv->content_height);
 	}
 
 	/* set the floating dimensions via the application's requested content size */
@@ -1123,12 +1198,14 @@ registry_handle_global(void *user_data,
 {
 	struct libdecor *context = user_data;
 
-	if (!strcmp(interface, xdg_wm_base_interface.name))
+	if (!strcmp(interface, xdg_wm_base_interface.name)) {
 		init_xdg_wm_base(context, id, version);
-	else if (!strcmp(interface, zxdg_decoration_manager_v1_interface.name))
+	} else if (!strcmp(interface, zxdg_decoration_manager_v1_interface.name)) {
 		context->decoration_manager = wl_registry_bind(
 				context->wl_registry, id,
-				&zxdg_decoration_manager_v1_interface, version);
+				&zxdg_decoration_manager_v1_interface,
+				MIN(version,2));
+	}
 }
 
 static void
