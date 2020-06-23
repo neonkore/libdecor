@@ -8,6 +8,11 @@ cc = meson.get_compiler('c')
 
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
+add_project_arguments(cc.get_supported_arguments([
+  '-Wno-unused-parameter',
+  '-Wno-missing-field-initializers',
+  ]), language: 'c')
+
 wayland_client_req = '>= 1.18'
 wayland_protocols_req = '>= 1.15'
 dbus_req = '>= 1.0'
