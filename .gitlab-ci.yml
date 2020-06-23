@@ -6,7 +6,7 @@ stages:
 build-libdecoration:
   stage: build
   script:
-    - meson . build -Dbuildtype=debugoptimized --werror --prefix /usr
+    - meson . build -Dbuildtype=debugoptimized -Dwarning_level=2 --werror --prefix /usr
     - ninja -C build
     - ninja -C build install
   only:
