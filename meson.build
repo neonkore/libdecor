@@ -18,7 +18,8 @@ dbus_dep = dependency('dbus-1', version: dbus_req)
 dl_dep = cc.find_library('dl', required: true)
 wayland_egl_dep = dependency('wayland-egl')
 egl_dep = dependency('egl')
-gl_dep = dependency('gl')
+gles2_dep = dependency('glesv2')
+libm_dep = cc.find_library('m')
 
 # list of (function, prefix)
 required_functions = [
