@@ -903,7 +903,7 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 {
 	struct libdecor_frame *frame = &frame_cairo->frame;
 	struct xdg_surface *xdg_surface;
-	int x, y, width, height;
+	int x = 0, y = 0, width = 0, height = 0;
 
 	switch (frame_cairo->decoration_type) {
 	case DECORATION_TYPE_NONE:
