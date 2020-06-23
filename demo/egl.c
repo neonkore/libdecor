@@ -4,8 +4,10 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include <libdecoration.h>
 #include <GL/gl.h>
+
+#include "libdecoration.h"
+#include "utils.h"
 
 static const size_t default_size = 200;
 
@@ -24,11 +26,9 @@ struct window {
 	EGLSurface egl_surface;
 	int content_width;
 	int content_height;
+	bool wait_for_configure;
 	bool open;
 };
-
-static void
-draw(struct window *window);
 
 static void
 frame_configure(struct libdecor_frame *frame,
@@ -46,12 +46,11 @@ frame_configure(struct libdecor_frame *frame,
 
 	window->content_width = width;
 	window->content_height = height;
+	window->wait_for_configure = false;
 
 	wl_egl_window_resize(window->egl_window,
 			     window->content_width, window->content_height,
 			     0, 0);
-
-	draw(window);
 
 	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(frame, state, configuration);
@@ -185,7 +184,7 @@ draw(struct window *window)
 	glClearColor(1,0,0,1);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	eglSwapBuffers(window->client->display, window->egl_surface);
+	eglSwapBuffers(window->client->egl_display, window->egl_surface);
 }
 
 int
@@ -195,8 +194,9 @@ main(int argc, char *argv[])
 	struct libdecor *context;
 	struct window *window;
 	struct client *client;
+	int ret = 0;
 
-	client = calloc(1, sizeof(struct client));
+	client = zalloc(sizeof *client);
 
 	client->display = wl_display_connect(NULL);
 	if (!client->display) {
@@ -208,9 +208,10 @@ main(int argc, char *argv[])
 	wl_registry_add_listener(wl_registry, &registry_listener, client);
 	wl_display_roundtrip(client->display);
 
-	window = calloc(1, sizeof(struct window));
+	window = zalloc(sizeof *window);
 	window->client = client;
 	window->open = true;
+	window->wait_for_configure = true;
 
 	setup(window);
 
@@ -225,11 +226,15 @@ main(int argc, char *argv[])
 	wl_display_roundtrip(client->display);
 
 	// wait for the first configure event
-	wl_display_dispatch(client->display);
+	//ret = wl_display_dispatch(client->display);
 
-	while (window->open) {
-		wl_display_dispatch_pending(client->display);
-		draw(window);
+	while (window->open && ret != -1) {
+		if (window->wait_for_configure) {
+			ret = wl_display_dispatch(client->display);
+		} else {
+			ret = wl_display_dispatch_pending(client->display);
+			draw(window);
+		}
 	}
 
 	free(window);
