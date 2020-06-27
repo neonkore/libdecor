@@ -115,6 +115,8 @@ struct libdecor_frame_private {
 	int floating_height;
 
 	enum zxdg_toplevel_decoration_v1_mode decoration_mode;
+
+	enum libdecor_capabilities capabilities;
 };
 
 static void
@@ -464,6 +466,13 @@ libdecor_decorate(struct libdecor *context,
 
 	wl_list_insert(&context->frames, &frame->link);
 
+	libdecor_frame_set_capabilities(frame,
+					LIBDECOR_ACTION_MOVE |
+					LIBDECOR_ACTION_RESIZE |
+					LIBDECOR_ACTION_MINIMIZE |
+					LIBDECOR_ACTION_FULLSCREEN |
+					LIBDECOR_ACTION_CLOSE);
+
 	if (context->init_done)
 		init_shell_surface(frame);
 
@@ -556,6 +565,27 @@ libdecor_frame_set_app_id(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
+libdecor_frame_set_capabilities(struct libdecor_frame *frame,
+				enum libdecor_capabilities capabilities)
+{
+	frame->priv->capabilities |= capabilities;
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_unset_capabilities(struct libdecor_frame *frame,
+				  enum libdecor_capabilities capabilities)
+{
+	frame->priv->capabilities &= ~capabilities;
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_has_capability(struct libdecor_frame *frame,
+			      enum libdecor_capabilities capability)
+{
+	return frame->priv->capabilities & capability;
+}
+
+LIBDECOR_EXPORT void
 libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 				struct wl_seat *wl_seat,
 				uint32_t serial,
@@ -583,13 +613,6 @@ libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 
 	frame_priv->state.max_content_width = content_width;
 	frame_priv->state.max_content_height = content_height;
-
-	if (!frame_priv->xdg_toplevel)
-		return;
-
-	xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
-				  content_width,
-				  content_height);
 }
 
 LIBDECOR_EXPORT void
@@ -601,13 +624,6 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 
 	frame_priv->state.min_content_width = content_width;
 	frame_priv->state.min_content_height = content_height;
-
-	if (!frame_priv->xdg_toplevel)
-		return;
-
-	xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
-				  content_width,
-				  content_height);
 }
 
 LIBDECOR_EXPORT void
@@ -706,6 +722,24 @@ libdecor_frame_close(struct libdecor_frame *frame)
 	xdg_toplevel_close(frame, frame->priv->xdg_toplevel);
 }
 
+bool
+valid_limits(struct libdecor_frame_private *frame_priv)
+{
+	if (frame_priv->state.min_content_width > 0 &&
+	    frame_priv->state.max_content_width > 0 &&
+	    frame_priv->state.min_content_width >
+	    frame_priv->state.max_content_width)
+		return false;
+
+	if (frame_priv->state.min_content_height > 0 &&
+	    frame_priv->state.max_content_height > 0 &&
+	    frame_priv->state.min_content_height >
+	    frame_priv->state.max_content_height)
+		return false;
+
+	return true;
+}
+
 static void
 libdecor_frame_apply_state(struct libdecor_frame *frame,
 			   struct libdecor_state *state,
@@ -715,6 +749,28 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 
 	frame_priv->content_width = state->content_width;
 	frame_priv->content_height = state->content_height;
+
+	if (!valid_limits(frame_priv)) {
+		char *err_msg;
+		asprintf(&err_msg,
+			 "minimum size (%i,%i) must be smaller than maximum size (%i,%i)",
+			 frame_priv->state.min_content_width,
+			 frame_priv->state.min_content_height,
+			 frame_priv->state.max_content_width,
+			 frame_priv->state.max_content_height);
+		libdecor_notify_plugin_error(
+			frame_priv->context,
+			LIBDECOR_ERROR_INVALID_FRAME_CONFIGURATION,
+			err_msg);
+		free(err_msg);
+	}
+
+	xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
+				  frame_priv->state.min_content_width,
+				  frame_priv->state.min_content_height);
+	xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
+				  frame_priv->state.max_content_width,
+				  frame_priv->state.max_content_height);
 
 	if (configuration) {
 		if (configuration->has_window_state)

@@ -49,6 +49,7 @@ struct libdecor_state;
 
 enum libdecor_error {
 	LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+	LIBDECOR_ERROR_INVALID_FRAME_CONFIGURATION,
 };
 
 enum libdecor_window_state {
@@ -72,6 +73,14 @@ enum libdecor_resize_edge {
 	LIBDECOR_RESIZE_EDGE_RIGHT,
 	LIBDECOR_RESIZE_EDGE_TOP_RIGHT,
 	LIBDECOR_RESIZE_EDGE_BOTTOM_RIGHT,
+};
+
+enum libdecor_capabilities {
+	LIBDECOR_ACTION_MOVE = 1 << 0,
+	LIBDECOR_ACTION_RESIZE = 1 << 1,
+	LIBDECOR_ACTION_MINIMIZE = 1 << 2,
+	LIBDECOR_ACTION_FULLSCREEN = 1 << 3,
+	LIBDECOR_ACTION_CLOSE = 1 << 4,
 };
 
 struct libdecor_interface {
@@ -122,6 +131,18 @@ libdecor_frame_get_title(struct libdecor_frame *frame);
 void
 libdecor_frame_set_app_id(struct libdecor_frame *frame,
 			  const char *app_id);
+
+void
+libdecor_frame_set_capabilities(struct libdecor_frame *frame,
+				enum libdecor_capabilities capabilities);
+
+void
+libdecor_frame_unset_capabilities(struct libdecor_frame *frame,
+				  enum libdecor_capabilities capabilities);
+
+bool
+libdecor_frame_has_capability(struct libdecor_frame *frame,
+			      enum libdecor_capabilities capability);
 
 void
 libdecor_frame_show_window_menu(struct libdecor_frame *frame,
