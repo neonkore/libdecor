@@ -211,6 +211,30 @@ own_surface(struct wl_surface *surface)
 		&libdecoration_cairo_proxy_tag);
 }
 
+static bool
+moveable(struct libdecor_frame_cairo *frame_cairo) {
+	return libdecor_frame_has_capability(&frame_cairo->frame,
+					     LIBDECOR_ACTION_MOVE);
+}
+
+static bool
+resizable(struct libdecor_frame_cairo *frame_cairo) {
+	return libdecor_frame_has_capability(&frame_cairo->frame,
+					     LIBDECOR_ACTION_RESIZE);
+}
+
+static bool
+minimizable(struct libdecor_frame_cairo *frame_cairo) {
+	return libdecor_frame_has_capability(&frame_cairo->frame,
+					     LIBDECOR_ACTION_MINIMIZE);
+}
+
+static bool
+closeable(struct libdecor_frame_cairo *frame_cairo) {
+	return libdecor_frame_has_capability(&frame_cairo->frame,
+					     LIBDECOR_ACTION_CLOSE);
+}
+
 struct libdecor_plugin *
 libdecor_plugin_new(struct libdecor *context);
 
@@ -319,6 +343,9 @@ create_anonymous_file(off_t size)
 static void
 toggle_maximized(struct libdecor_frame *const frame)
 {
+	if (!resizable((struct libdecor_frame_cairo *)frame))
+		return;
+
 	if (!(libdecor_frame_get_window_state(frame) &
 	      LIBDECOR_WINDOW_STATE_MAXIMIZED))
 		libdecor_frame_set_maximized(frame);
@@ -614,6 +641,13 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	int fade_start;
 	cairo_pattern_t *fade;
 
+	bool cap_min, cap_max, cap_close;
+
+	/* capabilities of decorations */
+	cap_min = minimizable(frame_cairo);
+	cap_max = resizable(frame_cairo);
+	cap_close = closeable(frame_cairo);
+
 	/* clear buffer */
 	memset(buffer->data, 0, buffer->data_size);
 
@@ -646,21 +680,21 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		cairo_paint(cr);
 		break;
 	case BUTTON_MIN:
-		if (frame_cairo->active == &frame_cairo->title_bar.min)
+		if (cap_min && frame_cairo->active == &frame_cairo->title_bar.min)
 			cairo_set_rgba32(cr, &COL_BUTTON_MIN);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
 		cairo_paint(cr);
 		break;
 	case BUTTON_MAX:
-		if (frame_cairo->active == &frame_cairo->title_bar.max)
+		if (cap_max && frame_cairo->active == &frame_cairo->title_bar.max)
 			cairo_set_rgba32(cr, &COL_BUTTON_MAX);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
 		cairo_paint(cr);
 		break;
 	case BUTTON_CLOSE:
-		if (frame_cairo->active == &frame_cairo->title_bar.close)
+		if (cap_close && frame_cairo->active == &frame_cairo->title_bar.close)
 			cairo_set_rgba32(cr, &COL_BUTTON_CLOSE);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
@@ -697,7 +731,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		cairo_pattern_destroy(fade);
 		break;
 	case BUTTON_MIN:
-		if (frame_cairo->active == &frame_cairo->title_bar.min)
+		if (!cap_min || frame_cairo->active == &frame_cairo->title_bar.min)
 			cairo_set_rgba32(cr, &COL_SYM_ACT);
 		else
 			cairo_set_rgba32(cr, &COL_SYM);
@@ -706,7 +740,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		cairo_stroke(cr);
 		break;
 	case BUTTON_MAX:
-		if (frame_cairo->active == &frame_cairo->title_bar.max)
+		if (!cap_max || frame_cairo->active == &frame_cairo->title_bar.max)
 			cairo_set_rgba32(cr, &COL_SYM_ACT);
 		else
 			cairo_set_rgba32(cr, &COL_SYM);
@@ -734,7 +768,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		cairo_stroke(cr);
 		break;
 	case BUTTON_CLOSE:
-		if (frame_cairo->active == &frame_cairo->title_bar.close)
+		if (!cap_close || frame_cairo->active == &frame_cairo->title_bar.close)
 			cairo_set_rgba32(cr, &COL_SYM_ACT);
 		else
 			cairo_set_rgba32(cr, &COL_SYM);
@@ -980,6 +1014,16 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 
 	draw_decoration(frame_cairo);
 	set_window_geometry(frame_cairo);
+
+	/* set fixed window size */
+	if (!resizable(frame_cairo)) {
+		libdecor_frame_set_min_content_size(frame,
+						    frame_cairo->content_width,
+						    frame_cairo->content_height);
+		libdecor_frame_set_max_content_size(frame,
+						    frame_cairo->content_width,
+						    frame_cairo->content_height);
+	}
 }
 
 static bool
@@ -1218,7 +1262,7 @@ set_cursor(struct seat *seat, struct wl_pointer *wl_pointer)
 		break;
 	}
 
-	if (edge != LIBDECOR_RESIZE_EDGE_NONE)
+	if (edge != LIBDECOR_RESIZE_EDGE_NONE && resizable(frame_cairo))
 		wl_cursor = plugin_cairo->cursors[edge-1];
 
 	if (wl_cursor == NULL)
@@ -1367,7 +1411,7 @@ pointer_button(void *data,
 				    DOUBLE_CLICK_TIME_MS) {
 					toggle_maximized(&frame_cairo->frame);
 				}
-				else {
+				else if (moveable(frame_cairo)) {
 					seat->pointer_button_time_stamp = time;
 					libdecor_frame_move(&frame_cairo->frame,
 							    seat->wl_seat,
@@ -1378,7 +1422,8 @@ pointer_button(void *data,
 				break;
 			}
 
-			if (edge != LIBDECOR_RESIZE_EDGE_NONE) {
+			if (edge != LIBDECOR_RESIZE_EDGE_NONE &&
+			    resizable(frame_cairo)) {
 				libdecor_frame_resize(
 					&frame_cairo->frame,
 					seat->wl_seat,
@@ -1389,14 +1434,16 @@ pointer_button(void *data,
 		else if (state == WL_POINTER_BUTTON_STATE_RELEASED) {
 			switch (frame_cairo->active->type) {
 			case BUTTON_MIN:
-				libdecor_frame_set_minimized(
+				if (minimizable(frame_cairo))
+					libdecor_frame_set_minimized(
 							&frame_cairo->frame);
 				break;
 			case BUTTON_MAX:
 				toggle_maximized(&frame_cairo->frame);
 				break;
 			case BUTTON_CLOSE:
-				libdecor_frame_close(&frame_cairo->frame);
+				if (closeable(frame_cairo))
+					libdecor_frame_close(&frame_cairo->frame);
 				break;
 			default:
 				break;
