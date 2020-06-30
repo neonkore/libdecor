@@ -1479,7 +1479,7 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 	wl_list_insert(&plugin_cairo->seat_list, &seat->link);
 	seat->wl_seat =
 		wl_registry_bind(plugin_cairo->wl_registry,
-				 id, &wl_seat_interface, 1);
+				 id, &wl_seat_interface, 3);
 	wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
 }
 

@@ -215,7 +215,7 @@ registry_handle_global(void *user_data,
 		wl_shm_add_listener(wl_shm, &shm_listener, NULL);
 	} else if (strcmp(interface, "wl_seat") == 0) {
 		wl_seat = wl_registry_bind(wl_registry,
-					   id, &wl_seat_interface, 1);
+					   id, &wl_seat_interface, 3);
 		wl_seat_add_listener(wl_seat, &seat_listener, NULL);
 	}
 }
