@@ -214,6 +214,11 @@ registry_handle_global(void *user_data,
 					  id, &wl_shm_interface, 1);
 		wl_shm_add_listener(wl_shm, &shm_listener, NULL);
 	} else if (strcmp(interface, "wl_seat") == 0) {
+		if (version < 3) {
+			fprintf(stderr, "%s version 3 required but only version "
+					"%i is available\n", interface, version);
+			exit(EXIT_FAILURE);
+		}
 		wl_seat = wl_registry_bind(wl_registry,
 					   id, &wl_seat_interface, 3);
 		wl_seat_add_listener(wl_seat, &seat_listener, NULL);

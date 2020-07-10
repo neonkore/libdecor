@@ -1474,6 +1474,18 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 {
 	struct seat *seat;
 
+	if (version < 3) {
+		char *err_msg;
+		asprintf(&err_msg,
+			 "%s version 3 required but only version %i is available\n",
+			 wl_seat_interface.name, version);
+		libdecor_notify_plugin_error(
+				plugin_cairo->context,
+				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+				err_msg);
+		free(err_msg);
+	}
+
 	seat = zalloc(sizeof *seat);
 	seat->plugin_cairo = plugin_cairo;
 	wl_list_insert(&plugin_cairo->seat_list, &seat->link);
