@@ -47,6 +47,7 @@ static const size_t TITLE_HEIGHT = 24;
 static const size_t BUTTON_WIDTH = 32;
 static const size_t SYM_DIM = 14;
 
+/* default colors */
 static const uint32_t COL_TITLE = 0xFF080706;
 static const uint32_t COL_BUTTON_MIN = 0xFFFFBB00;
 static const uint32_t COL_BUTTON_MAX = 0xFF238823;
@@ -93,6 +94,32 @@ alpha(const uint32_t *const col) {
 void
 cairo_set_rgba32(cairo_t *cr, const uint32_t *const c) {
 	cairo_set_source_rgba(cr, red(c), green(c), blue(c), alpha(c));
+}
+
+void
+cairo_set_rgba(cairo_t *cr, const double (*const c)[4]) {
+	cairo_set_source_rgba(cr, (*c)[0], (*c)[1], (*c)[2], (*c)[3]);
+}
+
+void set_color_c32(const uint32_t *const c32, double (*c)[4]) {
+	(*c)[0] = red(c32);
+	(*c)[1] = green(c32);
+	(*c)[2] = blue(c32);
+	(*c)[3] = alpha(c32);
+}
+
+bool
+value_get_rgba(const struct libdecor_value *value,
+	       double (*color)[4]) {
+	if (value->type != LIBDECOR_VALUE_TYPE_COLOR)
+		return false;
+
+	(*color)[0] = value->color.red;
+	(*color)[1] = value->color.green;
+	(*color)[2] = value->color.blue;
+	(*color)[3] = value->color.alpha;
+
+	return true;
 }
 
 enum decoration_type {
@@ -172,6 +199,15 @@ struct libdecor_frame_cairo {
 
 	/* store pre-processed shadow tile */
 	cairo_surface_t *shadow_blur;
+
+	struct {
+		double title[4];
+		double button_min[4];
+		double button_max[4];
+		double button_close[4];
+		double sym[4];
+		double sym_act[4];
+	} color;
 };
 
 struct libdecor_plugin_cairo {
@@ -286,6 +322,14 @@ libdecor_frame_cairo_new(struct libdecor_plugin_cairo *plugin_cairo)
 
 	static const int size = 128;
 	static const int boundary = 32;
+
+	/* set default configuration */
+	set_color_c32(&COL_TITLE, &frame_cairo->color.title);
+	set_color_c32(&COL_BUTTON_MIN, &frame_cairo->color.button_min);
+	set_color_c32(&COL_BUTTON_MAX, &frame_cairo->color.button_max);
+	set_color_c32(&COL_BUTTON_CLOSE, &frame_cairo->color.button_close);
+	set_color_c32(&COL_SYM, &frame_cairo->color.sym);
+	set_color_c32(&COL_SYM_ACT, &frame_cairo->color.sym_act);
 
 	frame_cairo->plugin_cairo = plugin_cairo;
 	frame_cairo->shadow_blur = cairo_image_surface_create(
@@ -676,26 +720,26 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 			      64);
 		break;
 	case TITLE:
-		cairo_set_rgba32(cr, &COL_TITLE);
+		cairo_set_rgba(cr, &frame_cairo->color.title);
 		cairo_paint(cr);
 		break;
 	case BUTTON_MIN:
 		if (cap_min && frame_cairo->active == &frame_cairo->title_bar.min)
-			cairo_set_rgba32(cr, &COL_BUTTON_MIN);
+			cairo_set_rgba(cr, &frame_cairo->color.button_min);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
 		cairo_paint(cr);
 		break;
 	case BUTTON_MAX:
 		if (cap_max && frame_cairo->active == &frame_cairo->title_bar.max)
-			cairo_set_rgba32(cr, &COL_BUTTON_MAX);
+			cairo_set_rgba(cr, &frame_cairo->color.button_max);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
 		cairo_paint(cr);
 		break;
 	case BUTTON_CLOSE:
 		if (cap_close && frame_cairo->active == &frame_cairo->title_bar.close)
-			cairo_set_rgba32(cr, &COL_BUTTON_CLOSE);
+			cairo_set_rgba(cr, &frame_cairo->color.button_close);
 		else
 			cairo_set_source_rgba(cr, 0, 0, 0, 0);
 		cairo_paint(cr);
@@ -712,7 +756,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 				       CAIRO_FONT_SLANT_NORMAL,
 				       CAIRO_FONT_WEIGHT_BOLD);
 		cairo_set_font_size(cr, SYM_DIM);
-		cairo_set_rgba32(cr, &COL_SYM);
+		cairo_set_rgba(cr, &frame_cairo->color.sym);
 		cairo_move_to(cr, BUTTON_WIDTH, y + SYM_DIM - 1);
 		cairo_show_text(cr, libdecor_frame_get_title(
 					(struct libdecor_frame*)frame_cairo));
@@ -720,11 +764,15 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 				(struct libdecor_frame *)frame_cairo)-fade_width;
 		fade = cairo_pattern_create_linear(
 			       fade_start, 0, fade_start + 2 * BUTTON_WIDTH, 0);
-		cairo_pattern_add_color_stop_rgba(fade, 0, 0, 0, 0, 0);
+		cairo_pattern_add_color_stop_rgba(fade, 0,
+						  frame_cairo->color.title[0],
+						  frame_cairo->color.title[1],
+						  frame_cairo->color.title[2],
+						  0);
 		cairo_pattern_add_color_stop_rgb(fade, 1,
-						 red(&COL_TITLE),
-						 green(&COL_TITLE),
-						 blue(&COL_TITLE));
+						 frame_cairo->color.title[0],
+						 frame_cairo->color.title[1],
+						 frame_cairo->color.title[2]);
 		cairo_rectangle(cr, fade_start, 0, fade_width, TITLE_HEIGHT);
 		cairo_set_source(cr, fade);
 		cairo_fill(cr);
@@ -732,18 +780,18 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		break;
 	case BUTTON_MIN:
 		if (!cap_min || frame_cairo->active == &frame_cairo->title_bar.min)
-			cairo_set_rgba32(cr, &COL_SYM_ACT);
+			cairo_set_rgba(cr, &frame_cairo->color.sym_act);
 		else
-			cairo_set_rgba32(cr, &COL_SYM);
+			cairo_set_rgba(cr, &frame_cairo->color.sym);
 		cairo_move_to(cr, x, y + SYM_DIM - 1);
 		cairo_rel_line_to(cr, SYM_DIM - 1, 0);
 		cairo_stroke(cr);
 		break;
 	case BUTTON_MAX:
 		if (!cap_max || frame_cairo->active == &frame_cairo->title_bar.max)
-			cairo_set_rgba32(cr, &COL_SYM_ACT);
+			cairo_set_rgba(cr, &frame_cairo->color.sym_act);
 		else
-			cairo_set_rgba32(cr, &COL_SYM);
+			cairo_set_rgba(cr, &frame_cairo->color.sym);
 
 		state = libdecor_frame_get_window_state(
 				(struct libdecor_frame*)frame_cairo);
@@ -769,9 +817,9 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		break;
 	case BUTTON_CLOSE:
 		if (!cap_close || frame_cairo->active == &frame_cairo->title_bar.close)
-			cairo_set_rgba32(cr, &COL_SYM_ACT);
+			cairo_set_rgba(cr, &frame_cairo->color.sym_act);
 		else
-			cairo_set_rgba32(cr, &COL_SYM);
+			cairo_set_rgba(cr, &frame_cairo->color.sym);
 		cairo_move_to(cr, x, y);
 		cairo_rel_line_to(cr, SYM_DIM - 1, SYM_DIM - 1);
 		cairo_move_to(cr, x + SYM_DIM - 1, y);
@@ -1073,6 +1121,46 @@ libdecor_plugin_cairo_configuration_get_content_size(
 	return true;
 }
 
+static bool
+libdecor_plugin_cairo_frame_frame_set_value(struct libdecor_plugin *plugin,
+					    struct libdecor_frame *frame,
+					    const char *key,
+					    const struct libdecor_value *value)
+{
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+	bool valid = false;
+
+	if (strcmp(key, "color/titlebar")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.title);
+	}
+	else if (strcmp(key, "color/button/min")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.button_min);
+	}
+	else if (strcmp(key, "color/button/max")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.button_max);
+	}
+	else if (strcmp(key, "color/button/close")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.button_close);
+	}
+	else if (strcmp(key, "color/symbol")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.sym);
+	}
+	else if (strcmp(key, "color/symbol/active")==0) {
+		valid = value_get_rgba(value, &frame_cairo->color.sym_act);
+	}
+	else {
+		return false;
+	}
+
+	if (valid) {
+		draw_decoration(frame_cairo);
+		libdecor_frame_toplevel_commit(frame);
+	}
+
+	return valid;
+}
+
 static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.destroy = libdecor_plugin_cairo_destroy,
 
@@ -1082,6 +1170,8 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 
 	.configuration_get_content_size =
 			libdecor_plugin_cairo_configuration_get_content_size,
+
+	.frame_set_value = libdecor_plugin_cairo_frame_frame_set_value,
 };
 
 static void
