@@ -129,6 +129,16 @@ struct seat {
 	struct wl_list link;
 };
 
+struct output {
+	struct libdecor_plugin_cairo *plugin_cairo;
+
+	struct wl_output *wl_output;
+	uint32_t id;
+	int scale;
+
+	struct wl_list link;
+};
+
 struct buffer {
 	struct wl_buffer *wl_buffer;
 	bool in_use;
@@ -138,6 +148,9 @@ struct buffer {
 	size_t data_size;
 	int width;
 	int height;
+	int scale;
+	int buffer_width;
+	int buffer_height;
 };
 
 struct border_component {
@@ -145,6 +158,13 @@ struct border_component {
 	struct wl_surface *wl_surface;
 	struct wl_subsurface *wl_subsurface;
 	struct buffer *buffer;
+	struct wl_list output_list;
+	int scale;
+};
+
+struct surface_output {
+	struct output *output;
+	struct wl_list link;
 };
 
 struct libdecor_frame_cairo {
@@ -172,6 +192,8 @@ struct libdecor_frame_cairo {
 
 	/* store pre-processed shadow tile */
 	cairo_surface_t *shadow_blur;
+
+	struct wl_list link;
 };
 
 struct libdecor_plugin_cairo {
@@ -190,7 +212,9 @@ struct libdecor_plugin_cairo {
 	struct wl_callback *shm_callback;
 	bool has_argb;
 
+	struct wl_list visible_frame_list;
 	struct wl_list seat_list;
+	struct wl_list output_list;
 
 	struct wl_cursor_theme *cursor_theme;
 	char *cursor_theme_name;
@@ -242,11 +266,18 @@ static void
 buffer_free(struct buffer *buffer);
 
 static void
+draw_border_component(struct libdecor_frame_cairo *frame_cairo,
+		      struct border_component *border_component,
+		      enum component component);
+
+static void
 libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 {
 	struct libdecor_plugin_cairo *plugin_cairo =
 		(struct libdecor_plugin_cairo *) plugin;
-	struct seat *seat;
+	struct seat *seat, *seat_tmp;
+	struct output *output, *output_tmp;
+	struct libdecor_frame_cairo *frame, *frame_tmp;
 
 	if (plugin_cairo->globals_callback)
 		wl_callback_destroy(plugin_cairo->globals_callback);
@@ -256,13 +287,24 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 		wl_callback_destroy(plugin_cairo->shm_callback);
 	wl_registry_destroy(plugin_cairo->wl_registry);
 
-	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+	wl_list_for_each_safe(seat, seat_tmp, &plugin_cairo->seat_list, link) {
 		if (seat->wl_pointer)
 			wl_pointer_destroy(seat->wl_pointer);
 		if (seat->cursor_surface)
 			wl_surface_destroy(seat->cursor_surface);
 		wl_seat_destroy(seat->wl_seat);
 		free(seat);
+	}
+
+	wl_list_for_each_safe(output, output_tmp,
+			      &plugin_cairo->output_list, link) {
+		wl_output_destroy(output->wl_output);
+		free(output);
+	}
+
+	wl_list_for_each_safe(frame, frame_tmp,
+			      &plugin_cairo->visible_frame_list, link) {
+		wl_list_remove(&frame->link);
 	}
 
 	if (plugin_cairo->cursor_theme)
@@ -290,6 +332,7 @@ libdecor_frame_cairo_new(struct libdecor_plugin_cairo *plugin_cairo)
 	frame_cairo->plugin_cairo = plugin_cairo;
 	frame_cairo->shadow_blur = cairo_image_surface_create(
 					CAIRO_FORMAT_ARGB32, size, size);
+	wl_list_insert(&plugin_cairo->visible_frame_list, &frame_cairo->link);
 
 	cr = cairo_create(frame_cairo->shadow_blur);
 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
@@ -372,15 +415,18 @@ static const struct wl_buffer_listener buffer_listener = {
 static struct buffer *
 create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 		  int width,
-		  int height)
+		  int height,
+		  int scale)
 {
 	struct wl_shm_pool *pool;
-	int fd, size, stride;
+	int fd, size, buffer_width, buffer_height, stride;
 	void *data;
 	struct buffer *buffer;
 
-	stride = width * 4;
-	size = stride * height;
+	buffer_width = width * scale;
+	buffer_height = height * scale;
+	stride = buffer_width * 4;
+	size = stride * buffer_height;
 
 	fd = create_anonymous_file(size);
 	if (fd < 0) {
@@ -399,7 +445,7 @@ create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 	pool = wl_shm_create_pool(plugin_cairo->wl_shm, fd, size);
 	buffer = zalloc(sizeof *buffer);
 	buffer->wl_buffer = wl_shm_pool_create_buffer(pool, 0,
-						      width, height,
+						      buffer_width, buffer_height,
 						      stride,
 						      WL_SHM_FORMAT_ARGB8888);
 	wl_buffer_add_listener(buffer->wl_buffer, &buffer_listener, buffer);
@@ -410,6 +456,9 @@ create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 	buffer->data_size = size;
 	buffer->width = width;
 	buffer->height = height;
+	buffer->scale = scale;
+	buffer->buffer_width = buffer_width;
+	buffer->buffer_height = buffer_height;
 
 	return buffer;
 }
@@ -429,6 +478,8 @@ buffer_free(struct buffer *buffer)
 static void
 free_border_component(struct border_component *border_component)
 {
+	struct surface_output *surface_output, *surface_output_tmp;
+
 	if (border_component->wl_surface) {
 		wl_subsurface_destroy(border_component->wl_subsurface);
 		border_component->wl_subsurface = NULL;
@@ -438,6 +489,13 @@ free_border_component(struct border_component *border_component)
 	if (border_component->buffer) {
 		buffer_free(border_component->buffer);
 		border_component->buffer = NULL;
+	}
+	if (border_component->output_list.next != NULL) {
+		wl_list_for_each_safe(surface_output, surface_output_tmp,
+				      &border_component->output_list, link) {
+			wl_list_remove(&surface_output->link);
+			free(surface_output);
+		}
 	}
 }
 
@@ -461,6 +519,9 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	}
 
 	frame_cairo->decoration_type = DECORATION_TYPE_NONE;
+
+	if (frame_cairo->link.next != NULL)
+		wl_list_remove(&frame_cairo->link);
 }
 
 static bool
@@ -502,6 +563,100 @@ hide_title_bar_surfaces(struct libdecor_frame_cairo *frame_cairo)
 	frame_cairo->title_bar.is_showing = false;
 }
 
+static struct border_component *
+get_component_for_surface(struct libdecor_frame_cairo *frame_cairo,
+			  struct wl_surface *surface)
+{
+	if (frame_cairo->shadow.wl_surface == surface)
+		return &frame_cairo->shadow;
+	if (frame_cairo->title_bar.title.wl_surface == surface)
+		return &frame_cairo->title_bar.title;
+	if (frame_cairo->title_bar.min.wl_surface == surface)
+		return &frame_cairo->title_bar.min;
+	if (frame_cairo->title_bar.max.wl_surface == surface)
+		return &frame_cairo->title_bar.max;
+	if (frame_cairo->title_bar.close.wl_surface == surface)
+		return &frame_cairo->title_bar.close;
+	return NULL;
+}
+
+static bool
+redraw_scale(struct libdecor_frame_cairo *frame_cairo,
+	     struct border_component *cmpnt)
+{
+	struct surface_output *surface_output;
+	int scale = 1;
+
+	if (cmpnt->wl_surface == NULL)
+		return false;
+
+	wl_list_for_each(surface_output, &cmpnt->output_list, link) {
+		scale = MAX(scale, surface_output->output->scale);
+	}
+	if (scale != cmpnt->scale) {
+		cmpnt->scale = scale;
+		draw_border_component(frame_cairo, cmpnt, cmpnt->type);
+		return true;
+	}
+	return false;
+}
+
+static void
+surface_enter(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct surface_output *surface_output;
+	struct libdecor_frame_cairo *frame_cairo = data;
+	struct border_component *cmpnt;
+
+	cmpnt = get_component_for_surface(frame_cairo, wl_surface);
+	if (cmpnt == NULL)
+		return;
+
+	surface_output = zalloc(sizeof *surface_output);
+	surface_output->output = wl_output_get_user_data(wl_output);
+
+	if (surface_output->output == NULL) {
+		free(surface_output);
+		return;
+	}
+
+	wl_list_insert(&cmpnt->output_list, &surface_output->link);
+	if (redraw_scale(frame_cairo, cmpnt))
+		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+}
+
+static void
+surface_leave(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct surface_output *surface_output;
+	struct libdecor_frame_cairo *frame_cairo = data;
+	struct border_component *cmpnt;
+
+	cmpnt = get_component_for_surface(frame_cairo, wl_surface);
+	if (cmpnt == NULL)
+		return;
+
+	wl_list_for_each(surface_output, &cmpnt->output_list, link) {
+		if (surface_output->output->wl_output == wl_output) {
+			wl_list_remove(&surface_output->link);
+			free(surface_output);
+			if (redraw_scale(frame_cairo, cmpnt))
+				libdecor_frame_toplevel_commit(
+					&frame_cairo->frame);
+			break;
+		}
+	}
+}
+
+static struct wl_surface_listener surface_listener = {
+	surface_enter,
+	surface_leave,
+};
+
 static void
 create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 			       struct wl_surface **out_wl_surface,
@@ -516,7 +671,6 @@ create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 	struct wl_subsurface *wl_subsurface;
 
 	wl_surface = wl_compositor_create_surface(wl_compositor);
-	wl_surface_set_user_data(wl_surface, frame_cairo);
 	wl_proxy_set_tag((struct wl_proxy *) wl_surface,
 			 &libdecoration_cairo_proxy_tag);
 
@@ -534,10 +688,13 @@ ensure_component(struct libdecor_frame_cairo *frame_cairo,
 		 struct border_component *cmpnt)
 {
 	if (!cmpnt->wl_surface) {
+		wl_list_init(&cmpnt->output_list);
+		cmpnt->scale = 1;
 		create_surface_subsurface_pair(frame_cairo,
 					       &cmpnt->wl_surface,
 					       &cmpnt->wl_subsurface);
-		wl_surface_set_user_data(cmpnt->wl_surface, frame_cairo);
+		wl_surface_add_listener(cmpnt->wl_surface, &surface_listener,
+					frame_cairo);
 	}
 }
 
@@ -584,6 +741,8 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
 
 	switch (component) {
 	case NONE:
+		*component_width = 0;
+		*component_height = 0;
 		return;
 	case SHADOW:
 		*component_x = -(int)SHADOW_MARGIN;
@@ -653,13 +812,15 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 
 	surface = cairo_image_surface_create_for_data(
 			  buffer->data, CAIRO_FORMAT_ARGB32,
-			  buffer->width, buffer->height,
+			  buffer->buffer_width, buffer->buffer_height,
 			  cairo_format_stride_for_width(
 				  CAIRO_FORMAT_ARGB32,
-				  buffer->width)
+				  buffer->buffer_width)
 			  );
 
 	cr = cairo_create(surface);
+
+	cairo_scale(cr, buffer->scale, buffer->scale);
 
 	/* background */
 	switch (component) {
@@ -845,6 +1006,10 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 	int component_y;
 	int component_width;
 	int component_height;
+	int scale = border_component->scale;
+
+	if (border_component->wl_surface == NULL)
+		return;
 
 	calculate_component_size(frame_cairo, component,
 				 &component_x, &component_y,
@@ -855,8 +1020,8 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 	old_buffer = border_component->buffer;
 	if (old_buffer) {
 		if (!old_buffer->in_use &&
-		    old_buffer->width == component_width &&
-		    old_buffer->height == component_height) {
+		    old_buffer->buffer_width == component_width * scale &&
+		    old_buffer->buffer_height == component_height * scale) {
 			buffer = old_buffer;
 		} else {
 			buffer_free(old_buffer);
@@ -867,11 +1032,13 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 	if (!buffer)
 		buffer = create_shm_buffer(plugin_cairo,
 					   component_width,
-					   component_height);
+					   component_height,
+					   border_component->scale);
 
 	draw_component_content(frame_cairo, buffer, component);
 
 	wl_surface_attach(border_component->wl_surface, buffer->wl_buffer, 0, 0);
+	wl_surface_set_buffer_scale(border_component->wl_surface, buffer->scale);
 	buffer->in_use = true;
 	wl_surface_commit(border_component->wl_surface);
 	wl_surface_damage(border_component->wl_surface,
@@ -908,6 +1075,8 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 {
 	switch (frame_cairo->decoration_type) {
 	case DECORATION_TYPE_NONE:
+		if (frame_cairo->link.next != NULL)
+			wl_list_remove(&frame_cairo->link);
 		if (is_border_surfaces_showing(frame_cairo))
 			hide_border_surfaces(frame_cairo);
 		if (is_title_bar_surfaces_showing(frame_cairo))
@@ -920,6 +1089,11 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 		/* show title bar */
 		ensure_title_bar_surfaces(frame_cairo);
 		draw_title_bar(frame_cairo);
+		/* link frame */
+		if (frame_cairo->link.next == NULL)
+			wl_list_insert(
+				&frame_cairo->plugin_cairo->visible_frame_list,
+				&frame_cairo->link);
 		break;
 	case DECORATION_TYPE_TITLE_ONLY:
 		/* hide borders */
@@ -928,6 +1102,11 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 		/* show title bar */
 		ensure_title_bar_surfaces(frame_cairo);
 		draw_title_bar(frame_cairo);
+		/* link frame */
+		if (frame_cairo->link.next == NULL)
+			wl_list_insert(
+				&frame_cairo->plugin_cairo->visible_frame_list,
+				&frame_cairo->link);
 		break;
 	}
 }
@@ -1311,23 +1490,7 @@ pointer_enter(void *data,
 	if (!frame_cairo)
 		return;
 
-	frame_cairo->active = NULL;
-
-	if (seat->pointer_focus == frame_cairo->shadow.wl_surface) {
-		frame_cairo->active = &frame_cairo->shadow;
-	}
-	else if (seat->pointer_focus == frame_cairo->title_bar.title.wl_surface) {
-		frame_cairo->active = &frame_cairo->title_bar.title;
-	}
-	else if (seat->pointer_focus == frame_cairo->title_bar.min.wl_surface) {
-		frame_cairo->active = &frame_cairo->title_bar.min;
-	}
-	else if (seat->pointer_focus == frame_cairo->title_bar.max.wl_surface) {
-		frame_cairo->active = &frame_cairo->title_bar.max;
-	}
-	else if (seat->pointer_focus == frame_cairo->title_bar.close.wl_surface) {
-		frame_cairo->active = &frame_cairo->title_bar.close;
-	}
+	frame_cairo->active = get_component_for_surface(frame_cairo, surface);
 
 	/* update decorations */
 	if (frame_cairo->active) {
@@ -1539,6 +1702,96 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 }
 
 static void
+output_geometry(void *data,
+		struct wl_output *wl_output,
+		int32_t x,
+		int32_t y,
+		int32_t physical_width,
+		int32_t physical_height,
+		int32_t subpixel,
+		const char *make,
+		const char *model,
+		int32_t transform)
+{
+}
+
+static void
+output_mode(void *data,
+	    struct wl_output *wl_output,
+	    uint32_t flags,
+	    int32_t width,
+	    int32_t height,
+	    int32_t refresh)
+{
+}
+
+static void
+output_done(void *data,
+	    struct wl_output *wl_output)
+{
+	struct output *output = data;
+	struct libdecor_frame_cairo *frame_cairo;
+
+	wl_list_for_each(frame_cairo,
+			&output->plugin_cairo->visible_frame_list, link) {
+		bool updated = false;
+		updated |= redraw_scale(frame_cairo, &frame_cairo->shadow);
+		updated |= redraw_scale(frame_cairo, &frame_cairo->title_bar.title);
+		updated |= redraw_scale(frame_cairo, &frame_cairo->title_bar.min);
+		updated |= redraw_scale(frame_cairo, &frame_cairo->title_bar.max);
+		updated |= redraw_scale(frame_cairo, &frame_cairo->title_bar.close);
+		if (updated)
+			libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	}
+}
+
+static void
+output_scale(void *data,
+	     struct wl_output *wl_output,
+	     int32_t factor)
+{
+	struct output *output = data;
+
+	output->scale = factor;
+}
+
+static struct wl_output_listener output_listener = {
+	output_geometry,
+	output_mode,
+	output_done,
+	output_scale
+};
+
+static void
+init_wl_output(struct libdecor_plugin_cairo *plugin_cairo,
+	       uint32_t id,
+	       uint32_t version)
+{
+	struct output *output;
+
+	if (version < 2) {
+		char *err_msg;
+		asprintf(&err_msg,
+			 "%s version 2 required but only version %i is available\n",
+			 wl_output_interface.name, version);
+		libdecor_notify_plugin_error(
+				plugin_cairo->context,
+				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
+				err_msg);
+		free(err_msg);
+	}
+
+	output = zalloc(sizeof *output);
+	output->plugin_cairo = plugin_cairo;
+	wl_list_insert(&plugin_cairo->output_list, &output->link);
+	output->id = id;
+	output->wl_output =
+		wl_registry_bind(plugin_cairo->wl_registry,
+				 id, &wl_output_interface, 2);
+	wl_output_add_listener(output->wl_output, &output_listener, output);
+}
+
+static void
 registry_handle_global(void *user_data,
 		       struct wl_registry *wl_registry,
 		       uint32_t id,
@@ -1555,6 +1808,41 @@ registry_handle_global(void *user_data,
 		init_wl_shm(plugin_cairo, id, version);
 	else if (strcmp(interface, "wl_seat") == 0)
 		init_wl_seat(plugin_cairo, id, version);
+	else if (strcmp(interface, "wl_output") == 0)
+		init_wl_output(plugin_cairo, id, version);
+}
+
+static void
+remove_surface_outputs(struct border_component *cmpnt, struct output *output)
+{
+	struct surface_output *surface_output;
+	wl_list_for_each(surface_output, &cmpnt->output_list, link) {
+		if (surface_output->output == output) {
+			wl_list_remove(&surface_output->link);
+			free(surface_output);
+			break;
+		}
+	}
+}
+
+static void
+output_removed(struct libdecor_plugin_cairo *plugin_cairo,
+	       struct output *output)
+{
+	struct libdecor_frame_cairo *frame_cairo;
+	struct seat *seat;
+
+	wl_list_for_each(frame_cairo, &plugin_cairo->visible_frame_list, link) {
+		remove_surface_outputs(&frame_cairo->shadow, output);
+		remove_surface_outputs(&frame_cairo->title_bar.title, output);
+		remove_surface_outputs(&frame_cairo->title_bar.min, output);
+		remove_surface_outputs(&frame_cairo->title_bar.max, output);
+		remove_surface_outputs(&frame_cairo->title_bar.close, output);
+	}
+
+	wl_list_remove(&output->link);
+	wl_output_destroy(output->wl_output);
+	free(output);
 }
 
 static void
@@ -1562,6 +1850,15 @@ registry_handle_global_remove(void *user_data,
 			      struct wl_registry *wl_registry,
 			      uint32_t name)
 {
+	struct libdecor_plugin_cairo *plugin_cairo = user_data;
+	struct output *output;
+
+	wl_list_for_each(output, &plugin_cairo->output_list, link) {
+		if (output->id == name) {
+			output_removed(plugin_cairo, output);
+			break;
+		}
+	}
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -1617,7 +1914,9 @@ libdecor_plugin_new(struct libdecor *context)
 	plugin_cairo->context = context;
 	plugin_cairo->cursor_theme = NULL;
 
+	wl_list_init(&plugin_cairo->visible_frame_list);
 	wl_list_init(&plugin_cairo->seat_list);
+	wl_list_init(&plugin_cairo->output_list);
 
 	/* fetch cursor theme and size*/
 	if (!libdecor_get_cursor_settings(&plugin_cairo->cursor_theme_name,
