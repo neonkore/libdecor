@@ -44,6 +44,20 @@
 #define DEFAULT_WIDTH 800
 #define DEFAULT_HEIGHT 600
 
+static const char *proxy_tag = "libdecoration-demo";
+
+static bool
+own_proxy(struct wl_proxy *proxy)
+{
+	return (wl_proxy_get_tag(proxy) == &proxy_tag);
+}
+
+static bool
+own_output(struct wl_output *output)
+{
+	return own_proxy((struct wl_proxy *) output);
+}
+
 struct buffer {
 	struct wl_buffer *wl_buffer;
 	void *data;
@@ -67,6 +81,13 @@ struct seat {
 	struct wl_seat *wl_seat;
 	struct wl_pointer *wl_pointer;
 	struct wl_list link;
+	struct wl_list pointer_outputs;
+	struct wl_cursor_theme *cursor_theme;
+	struct wl_cursor *left_ptr_cursor;
+	struct wl_surface *cursor_surface;
+	struct wl_surface *pointer_focus;
+	int pointer_scale;
+	uint32_t serial;
 };
 
 struct output {
@@ -81,14 +102,15 @@ struct window_output {
 	struct wl_list link;
 };
 
+struct pointer_output {
+	struct output* output;
+	struct wl_list link;
+};
+
 static struct wl_compositor *wl_compositor;
 static struct wl_shm *wl_shm;
 static struct wl_list seats;
 static struct wl_list outputs;
-static struct wl_cursor_theme *cursor_theme;
-static struct wl_cursor *left_ptr_cursor;
-static struct wl_surface *cursor_surface;
-static struct wl_surface *pointer_focus;
 
 static bool has_xrgb = false;
 
@@ -126,6 +148,120 @@ static struct wl_shm_listener shm_listener = {
 };
 
 static void
+try_update_cursor(struct seat *seat);
+
+static void
+cursor_surface_enter(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct seat *seat = data;
+	struct pointer_output *pointer_output;
+
+	if (!own_output(wl_output))
+		return;
+
+	pointer_output = zalloc(sizeof *pointer_output);
+	pointer_output->output = wl_output_get_user_data(wl_output);
+	wl_list_insert(&seat->pointer_outputs, &pointer_output->link);
+	try_update_cursor(seat);
+}
+
+static void
+cursor_surface_leave(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct seat *seat = data;
+	struct pointer_output *pointer_output;
+
+	wl_list_for_each(pointer_output, &seat->pointer_outputs, link) {
+		if (pointer_output->output->wl_output == wl_output) {
+			wl_list_remove(&pointer_output->link);
+			free(pointer_output);
+		}
+	}
+}
+
+static struct wl_surface_listener cursor_surface_listener = {
+	cursor_surface_enter,
+	cursor_surface_leave,
+};
+
+static void
+init_cursors(struct seat *seat)
+{
+	char *name;
+	int size;
+	struct wl_cursor_theme *theme;
+
+	if (!libdecor_get_cursor_settings(&name, &size)) {
+		name = NULL;
+		size = 24;
+	}
+	size *= seat->pointer_scale;
+
+	theme = wl_cursor_theme_load(name, size, wl_shm);
+	free(name);
+	if (theme != NULL) {
+		if (seat->cursor_theme)
+			wl_cursor_theme_destroy(seat->cursor_theme);
+		seat->cursor_theme = theme;
+	}
+	if (seat->cursor_theme)
+		seat->left_ptr_cursor
+		  = wl_cursor_theme_get_cursor(seat->cursor_theme, "left_ptr");
+	if (!seat->cursor_surface) {
+		seat->cursor_surface = wl_compositor_create_surface(
+								wl_compositor);
+		wl_surface_add_listener(seat->cursor_surface,
+					&cursor_surface_listener, seat);
+	}
+}
+
+static void
+set_cursor(struct seat *seat)
+{
+	struct wl_cursor *wl_cursor;
+	struct wl_cursor_image *image;
+	struct wl_buffer *buffer;
+	int scale = seat->pointer_scale;
+
+	if (!seat->cursor_theme)
+		return;
+
+	wl_cursor = seat->left_ptr_cursor;
+
+	image = wl_cursor->images[0];
+	buffer = wl_cursor_image_get_buffer(image);
+	wl_pointer_set_cursor(seat->wl_pointer, seat->serial,
+			      seat->cursor_surface,
+			      image->hotspot_x / scale,
+			      image->hotspot_y / scale);
+	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
+	wl_surface_damage_buffer(seat->cursor_surface, 0, 0,
+				 image->width, image->height);
+	wl_surface_commit(seat->cursor_surface);
+}
+
+static void
+try_update_cursor(struct seat *seat)
+{
+	struct pointer_output *pointer_output;
+	int scale = 1;
+
+	wl_list_for_each(pointer_output, &seat->pointer_outputs, link) {
+		scale = MAX(scale, pointer_output->output->scale);
+	}
+
+	if (scale != seat->pointer_scale) {
+		seat->pointer_scale = scale;
+		init_cursors(seat);
+		set_cursor(seat);
+	}
+}
+
+static void
 pointer_enter(void *data,
 	      struct wl_pointer *wl_pointer,
 	      uint32_t serial,
@@ -133,27 +269,15 @@ pointer_enter(void *data,
 	      wl_fixed_t surface_x,
 	      wl_fixed_t surface_y)
 {
-	struct wl_cursor *wl_cursor;
-	struct wl_cursor_image *image;
-	struct wl_buffer *buffer;
+	struct seat *seat = data;
 
-	pointer_focus = surface;
+	seat->pointer_focus = surface;
+	seat->serial = serial;
 
 	if (surface != window->wl_surface)
 		return;
 
-	wl_cursor = left_ptr_cursor;
-
-	image = wl_cursor->images[0];
-	buffer = wl_cursor_image_get_buffer(image);
-	wl_pointer_set_cursor(wl_pointer, serial,
-			      cursor_surface,
-			      image->hotspot_x,
-			      image->hotspot_y);
-	wl_surface_attach(cursor_surface, buffer, 0, 0);
-	wl_surface_damage_buffer(cursor_surface, 0, 0,
-				 image->width, image->height);
-	wl_surface_commit(cursor_surface);
+	set_cursor(seat);
 }
 
 static void
@@ -162,7 +286,9 @@ pointer_leave(void *data,
 	      uint32_t serial,
 	      struct wl_surface *surface)
 {
-	pointer_focus = NULL;
+	struct seat *seat = data;
+	if (seat->pointer_focus == surface)
+		seat->pointer_focus = NULL;
 }
 
 static void
@@ -185,7 +311,7 @@ pointer_button(void *data,
 	struct seat *seat = data;
 	if (button == BTN_LEFT &&
 	    state == WL_POINTER_BUTTON_STATE_PRESSED &&
-	    pointer_focus == window->wl_surface) {
+	    seat->pointer_focus == window->wl_surface) {
 		libdecor_frame_move(window->frame, seat->wl_seat, serial);
 	}
 }
@@ -218,6 +344,8 @@ seat_capabilities(void *data,
 		seat->wl_pointer = wl_seat_get_pointer(wl_seat);
 		wl_pointer_add_listener(seat->wl_pointer, &pointer_listener,
 					seat);
+		seat->pointer_scale = 1;
+		init_cursors(seat);
 	} else if (!(capabilities & WL_SEAT_CAPABILITY_POINTER) &&
 		   seat->wl_pointer) {
 		wl_pointer_release(seat->wl_pointer);
@@ -266,12 +394,16 @@ output_done(void *data,
 	    struct wl_output *wl_output)
 {
 	struct output *output = data;
+	struct seat *seat;
 
-	if (!window)
-		return;
+	if (window) {
+		if (output->scale != window->scale)
+			update_scale(window);
+	}
 
-	if (output->scale != window->scale)
-		update_scale(window);
+	wl_list_for_each(seat, &seats, link) {
+		try_update_cursor(seat);
+	}
 }
 
 static void
@@ -320,6 +452,7 @@ registry_handle_global(void *user_data,
 			exit(EXIT_FAILURE);
 		}
 		seat = zalloc(sizeof *seat);
+		wl_list_init(&seat->pointer_outputs);
 		seat->wl_seat = wl_registry_bind(wl_registry,
 						 id, &wl_seat_interface, 3);
 		wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
@@ -335,6 +468,8 @@ registry_handle_global(void *user_data,
 		output->wl_output = wl_registry_bind(wl_registry,
 						     id, &wl_output_interface,
 						     2);
+		wl_proxy_set_tag((struct wl_proxy *) output->wl_output,
+				 &proxy_tag);
 		wl_output_add_listener(output->wl_output, &output_listener,
 				       output);
 		wl_list_insert(&outputs, &output->link);
@@ -578,31 +713,18 @@ static struct libdecor_frame_interface libdecor_frame_iface = {
 };
 
 static void
-init_cursors(void)
-{
-	char *theme;
-	int size;
-
-	if (!libdecor_get_cursor_settings(&theme, &size)) {
-		theme = NULL;
-		size = 24;
-	}
-
-	cursor_theme = wl_cursor_theme_load(theme, size, wl_shm);
-	left_ptr_cursor = wl_cursor_theme_get_cursor(cursor_theme, "left_ptr");
-	cursor_surface = wl_compositor_create_surface(wl_compositor);
-
-	free(theme);
-}
-
-static void
 surface_enter(void *data,
 	      struct wl_surface *wl_surface,
 	      struct wl_output *wl_output)
 {
 	struct window *window = data;
-	struct output *output = wl_output_get_user_data(wl_output);
+	struct output *output;
 	struct window_output *window_output;
+
+	if (!own_output(wl_output))
+		return;
+
+	output = wl_output_get_user_data(wl_output);
 
 	if (output == NULL)
 		return;
@@ -619,11 +741,16 @@ surface_leave(void *data,
 	      struct wl_output *wl_output)
 {
 	struct window *window = data;
-	struct window_output *window_output = wl_output_get_user_data(wl_output);
+	struct window_output *window_output;
 
-	wl_list_remove(&window_output->link);
-	free(window_output);
-	update_scale(window);
+	wl_list_for_each(window_output, &window->outputs, link) {
+		if (window_output->output->wl_output == wl_output) {
+			wl_list_remove(&window_output->link);
+			free(window_output);
+			update_scale(window);
+			break;
+		}
+	}
 }
 
 static struct wl_surface_listener surface_listener = {
@@ -659,8 +786,6 @@ main(int argc,
 		fprintf(stderr, "No XRGB shm format\n");
 		return EXIT_FAILURE;
 	}
-
-	init_cursors();
 
 	window = zalloc(sizeof *window);
 	window->scale = 1;
