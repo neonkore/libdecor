@@ -56,13 +56,35 @@ struct window {
 	struct libdecor_frame *frame;
 	int content_width;
 	int content_height;
+	int configured_width;
+	int configured_height;
 	enum libdecor_window_state window_state;
+	struct wl_list outputs;
+	int scale;
+};
+
+struct seat {
+	struct wl_seat *wl_seat;
+	struct wl_pointer *wl_pointer;
+	struct wl_list link;
+};
+
+struct output {
+	uint32_t id;
+	struct wl_output *wl_output;
+	int scale;
+	struct wl_list link;
+};
+
+struct window_output {
+	struct output* output;
+	struct wl_list link;
 };
 
 static struct wl_compositor *wl_compositor;
 static struct wl_shm *wl_shm;
-static struct wl_seat *wl_seat;
-static struct wl_pointer *wl_pointer;
+static struct wl_list seats;
+static struct wl_list outputs;
 static struct wl_cursor_theme *cursor_theme;
 static struct wl_cursor *left_ptr_cursor;
 static struct wl_surface *cursor_surface;
@@ -71,6 +93,24 @@ static struct wl_surface *pointer_focus;
 static bool has_xrgb = false;
 
 static struct window *window;
+
+static void
+redraw(struct window *window);
+
+static void
+update_scale(struct window *window)
+{
+	int scale = 1;
+	struct window_output *window_output;
+
+	wl_list_for_each(window_output, &window->outputs, link) {
+		scale = MAX(scale, window_output->output->scale);
+	}
+	if (scale != window->scale) {
+		window->scale = scale;
+		redraw(window);
+	}
+}
 
 static void
 shm_format(void *data,
@@ -111,8 +151,8 @@ pointer_enter(void *data,
 			      image->hotspot_x,
 			      image->hotspot_y);
 	wl_surface_attach(cursor_surface, buffer, 0, 0);
-	wl_surface_damage(cursor_surface, 0, 0,
-			  image->width, image->height);
+	wl_surface_damage_buffer(cursor_surface, 0, 0,
+				 image->width, image->height);
 	wl_surface_commit(cursor_surface);
 }
 
@@ -142,10 +182,11 @@ pointer_button(void *data,
 	       uint32_t button,
 	       uint32_t state)
 {
+	struct seat *seat = data;
 	if (button == BTN_LEFT &&
 	    state == WL_POINTER_BUTTON_STATE_PRESSED &&
 	    pointer_focus == window->wl_surface) {
-		libdecor_frame_move(window->frame, wl_seat, serial);
+		libdecor_frame_move(window->frame, seat->wl_seat, serial);
 	}
 }
 
@@ -171,14 +212,16 @@ seat_capabilities(void *data,
 		  struct wl_seat *wl_seat,
 		  uint32_t capabilities)
 {
+	struct seat *seat = data;
 	if (capabilities & WL_SEAT_CAPABILITY_POINTER &&
-	    !wl_pointer) {
-		wl_pointer = wl_seat_get_pointer(wl_seat);
-		wl_pointer_add_listener(wl_pointer, &pointer_listener, NULL);
+	    !seat->wl_pointer) {
+		seat->wl_pointer = wl_seat_get_pointer(wl_seat);
+		wl_pointer_add_listener(seat->wl_pointer, &pointer_listener,
+					seat);
 	} else if (!(capabilities & WL_SEAT_CAPABILITY_POINTER) &&
-		   wl_pointer) {
-		wl_pointer_release(wl_pointer);
-		wl_pointer = NULL;
+		   seat->wl_pointer) {
+		wl_pointer_release(seat->wl_pointer);
+		seat->wl_pointer = NULL;
 	}
 }
 
@@ -195,12 +238,69 @@ static struct wl_seat_listener seat_listener = {
 };
 
 static void
+output_geometry(void *data,
+		struct wl_output *wl_output,
+		int32_t x,
+		int32_t y,
+		int32_t physical_width,
+		int32_t physical_height,
+		int32_t subpixel,
+		const char *make,
+		const char *model,
+		int32_t transform)
+{
+}
+
+static void
+output_mode(void *data,
+	    struct wl_output *wl_output,
+	    uint32_t flags,
+	    int32_t width,
+	    int32_t height,
+	    int32_t refresh)
+{
+}
+
+static void
+output_done(void *data,
+	    struct wl_output *wl_output)
+{
+	struct output *output = data;
+
+	if (!window)
+		return;
+
+	if (output->scale != window->scale)
+		update_scale(window);
+}
+
+static void
+output_scale(void *data,
+	     struct wl_output *wl_output,
+	     int32_t factor)
+{
+	struct output *output = data;
+
+	output->scale = factor;
+}
+
+static struct wl_output_listener output_listener = {
+	output_geometry,
+	output_mode,
+	output_done,
+	output_scale
+};
+
+static void
 registry_handle_global(void *user_data,
 		       struct wl_registry *wl_registry,
 		       uint32_t id,
 		       const char *interface,
 		       uint32_t version)
 {
+	struct seat *seat;
+	struct output *output;
+
 	if (strcmp(interface, "wl_compositor") == 0) {
 		if (version < 4) {
 			fprintf(stderr, "wl_compositor version >= 4 required");
@@ -219,9 +319,25 @@ registry_handle_global(void *user_data,
 					"%i is available\n", interface, version);
 			exit(EXIT_FAILURE);
 		}
-		wl_seat = wl_registry_bind(wl_registry,
-					   id, &wl_seat_interface, 3);
-		wl_seat_add_listener(wl_seat, &seat_listener, NULL);
+		seat = zalloc(sizeof *seat);
+		seat->wl_seat = wl_registry_bind(wl_registry,
+						 id, &wl_seat_interface, 3);
+		wl_seat_add_listener(seat->wl_seat, &seat_listener, seat);
+	} else if (strcmp(interface, "wl_output") == 0) {
+		if (version < 2) {
+			fprintf(stderr, "%s version 3 required but only version "
+					"%i is available\n", interface, version);
+			exit(EXIT_FAILURE);
+		}
+		output = zalloc(sizeof *output);
+		output->id = id;
+		output->scale = 1;
+		output->wl_output = wl_registry_bind(wl_registry,
+						     id, &wl_output_interface,
+						     2);
+		wl_output_add_listener(output->wl_output, &output_listener,
+				       output);
+		wl_list_insert(&outputs, &output->link);
 	}
 }
 
@@ -229,6 +345,24 @@ static void
 registry_handle_global_remove(void *data, struct wl_registry *registry,
 			      uint32_t name)
 {
+	struct output *output;
+	struct window_output *window_output;
+
+	wl_list_for_each(output, &outputs, link) {
+		if (output->id == name) {
+			wl_list_for_each(window_output, &window->outputs,
+					 link) {
+				if (window_output->output == output) {
+					wl_list_remove(&window_output->link);
+					free(window_output);
+				}
+			}
+			wl_list_remove(&output->link);
+			wl_output_destroy(output->wl_output);
+			free(output);
+			break;
+		}
+	}
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -337,19 +471,56 @@ static void
 paint_buffer(struct buffer *buffer,
 	     int width,
 	     int height,
+	     int scale,
 	     enum libdecor_window_state window_state)
 {
 	uint32_t *pixels = buffer->data;
-	uint32_t color;
-	int i;
+	uint32_t bg, fg, color;
+	int y, x, sx, sy;
+	size_t off;
+	int stride = width * scale;
+	const int chk = 16;
 
-	if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE)
-		color = 0xffbcbcbc;
-	else
-		color = 0xff8e8e8e;
+	if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE) {
+		fg = 0xffbcbcbc;
+		bg = 0xff8e8e8e;
+	} else {
+		fg = 0xff8e8e8e;
+		bg = 0xff484848;
+	}
 
-	for (i = 0; i < width * height; i++)
-		pixels[i] = color;
+	for (y = 0; y < height; y++) {
+		for (x = 0; x < width; x++) {
+			color = (x & chk) ^ (y & chk) ? fg : bg;
+			for (sx = 0; sx < scale; sx++) {
+				for (sy = 0; sy < scale; sy++) {
+					off = x * scale + sx
+					      + (y * scale + sy) * stride;
+					pixels[off] = color;
+				}
+			}
+		}
+	}
+}
+
+static void
+redraw(struct window *window)
+{
+	struct buffer *buffer;
+
+	buffer = create_shm_buffer(window->configured_width * window->scale,
+				   window->configured_height * window->scale,
+				   WL_SHM_FORMAT_XRGB8888);
+	paint_buffer(buffer, window->configured_width,
+		     window->configured_height, window->scale,
+		     window->window_state);
+
+	wl_surface_attach(window->wl_surface, buffer->wl_buffer, 0, 0);
+	wl_surface_set_buffer_scale(window->wl_surface, window->scale);
+	wl_surface_damage_buffer(window->wl_surface, 0, 0,
+				 window->configured_width * window->scale,
+				 window->configured_height * window->scale);
+	wl_surface_commit(window->wl_surface);
 }
 
 static void
@@ -358,7 +529,6 @@ handle_configure(struct libdecor_frame *frame,
 		 void *user_data)
 {
 	struct window *window = user_data;
-	struct buffer *buffer;
 	int width, height;
 	enum libdecor_window_state window_state;
 	struct libdecor_state *state;
@@ -372,19 +542,20 @@ handle_configure(struct libdecor_frame *frame,
 	width = (width == 0) ? DEFAULT_WIDTH : width;
 	height = (height == 0) ? DEFAULT_HEIGHT : height;
 
-	if (!libdecor_configuration_get_window_state(configuration, &window_state))
+	window->configured_width = width;
+	window->configured_height = height;
+
+	if (!libdecor_configuration_get_window_state(configuration,
+						     &window_state))
 		window_state = LIBDECOR_WINDOW_STATE_NONE;
 
-	buffer = create_shm_buffer(width, height, WL_SHM_FORMAT_XRGB8888);
-	paint_buffer(buffer, width, height, window_state);
+	window->window_state = window_state;
 
 	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(frame, state, configuration);
 	libdecor_state_free(state);
 
-	wl_surface_attach(window->wl_surface, buffer->wl_buffer, 0, 0);
-	wl_surface_damage(window->wl_surface, 0, 0, width, height);
-	wl_surface_commit(window->wl_surface);
+	redraw(window);
 }
 
 static void
@@ -424,6 +595,42 @@ init_cursors(void)
 	free(theme);
 }
 
+static void
+surface_enter(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct window *window = data;
+	struct output *output = wl_output_get_user_data(wl_output);
+	struct window_output *window_output;
+
+	if (output == NULL)
+		return;
+
+	window_output = zalloc(sizeof *window_output);
+	window_output->output = output;
+	wl_list_insert(&window->outputs, &window_output->link);
+	update_scale(window);
+}
+
+static void
+surface_leave(void *data,
+	      struct wl_surface *wl_surface,
+	      struct wl_output *wl_output)
+{
+	struct window *window = data;
+	struct window_output *window_output = wl_output_get_user_data(wl_output);
+
+	wl_list_remove(&window_output->link);
+	free(window_output);
+	update_scale(window);
+}
+
+static struct wl_surface_listener surface_listener = {
+	surface_enter,
+	surface_leave,
+};
+
 int
 main(int argc,
      char **argv)
@@ -431,12 +638,16 @@ main(int argc,
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
 	struct libdecor *context;
+	struct output *output;
 
 	wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
 		fprintf(stderr, "No Wayland connection\n");
 		return EXIT_FAILURE;
 	}
+
+	wl_list_init(&seats);
+	wl_list_init(&outputs);
 
 	wl_registry = wl_display_get_registry(wl_display);
 	wl_registry_add_listener(wl_registry,
@@ -452,7 +663,13 @@ main(int argc,
 	init_cursors();
 
 	window = zalloc(sizeof *window);
+	window->scale = 1;
+	wl_list_for_each(output, &outputs, link) {
+		window->scale = MAX(window->scale, output->scale);
+	}
+	wl_list_init(&window->outputs);
 	window->wl_surface = wl_compositor_create_surface(wl_compositor);
+	wl_surface_add_listener(window->wl_surface, &surface_listener, window);
 
 	context = libdecor_new(wl_display, &libdecor_iface);
 	window->frame = libdecor_decorate(context, window->wl_surface,
@@ -462,6 +679,8 @@ main(int argc,
 	libdecor_frame_map(window->frame);
 
 	while (wl_display_dispatch(wl_display) != -1);
+
+	free(window);
 
 	return EXIT_SUCCESS;
 }
