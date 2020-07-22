@@ -41,6 +41,10 @@
 #include "utils.h"
 #include "cursor-settings.h"
 
+#ifdef CUSTOM_PLUGIN
+#include "plugin.c"
+#endif
+
 #define DEFAULT_WIDTH 800
 #define DEFAULT_HEIGHT 600
 
@@ -455,8 +459,14 @@ main(int argc,
 	window->wl_surface = wl_compositor_create_surface(wl_compositor);
 
 	context = libdecor_new(wl_display, &libdecor_iface);
+#ifndef CUSTOM_PLUGIN
 	window->frame = libdecor_decorate(context, window->wl_surface,
 					  &libdecor_frame_iface, window);
+#else
+	window->frame = libdecor_decorate_custom(context, window->wl_surface,
+						 &libdecor_frame_iface, window,
+						 custom_plugin_new);
+#endif
 	libdecor_frame_set_app_id(window->frame, "libdecoration-demo");
 	libdecor_frame_set_title(window->frame, "libdecoration demo");
 	libdecor_frame_map(window->frame);

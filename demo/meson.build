@@ -20,6 +20,7 @@ executable('libdecor-demo-static',
     top_includepath,
     libdecoration_includepath,
   ],
+  c_args : '-DCUSTOM_PLUGIN',
   dependencies: [libdecoration_static_dep, wayland_cursor_dep, cursor_settings_dep],
   install: false,
 )
