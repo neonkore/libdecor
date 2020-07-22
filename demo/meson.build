@@ -14,6 +14,16 @@ executable('libdecor-demo',
   install: false,
 )
 
+executable('libdecor-demo-static',
+  sources: ['demo.c',],
+  include_directories: [
+    top_includepath,
+    libdecoration_includepath,
+  ],
+  dependencies: [libdecoration_static_dep, wayland_cursor_dep, cursor_settings_dep],
+  install: false,
+)
+
 executable('libdecor-egl',
   sources: 'egl.c',
   include_directories: libdecoration_includepath,
