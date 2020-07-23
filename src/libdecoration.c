@@ -610,6 +610,14 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 				  content_height);
 }
 
+LIBDECOR_EXPORT void
+libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
+				   int32_t x, int32_t y,
+				   int32_t width, int32_t height)
+{
+	xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
+}
+
 enum xdg_toplevel_resize_edge
 edge_to_xdg_edge(enum libdecor_resize_edge edge)
 {
