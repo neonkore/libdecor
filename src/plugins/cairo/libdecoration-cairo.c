@@ -38,8 +38,6 @@
 #include "utils.h"
 #include "cursor-settings.h"
 
-#include "xdg-shell-client-protocol.h"
-
 #include <cairo/cairo.h>
 
 #include "libdecoration-cairo-blur.h"
@@ -904,7 +902,6 @@ static void
 set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 {
 	struct libdecor_frame *frame = &frame_cairo->frame;
-	struct xdg_surface *xdg_surface;
 	int x = 0, y = 0, width = 0, height = 0;
 
 	switch (frame_cairo->decoration_type) {
@@ -928,8 +925,7 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 		break;
 	}
 
-	xdg_surface = libdecor_frame_get_xdg_surface(frame);
-	xdg_surface_set_window_geometry(xdg_surface, x, y, width, height);
+	libdecor_frame_set_window_geometry(frame, x, y, width, height);
 }
 
 static enum decoration_type
