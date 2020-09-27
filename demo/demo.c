@@ -462,6 +462,17 @@ main(int argc,
 	libdecor_frame_set_title(window->frame, "libdecoration demo");
 	libdecor_frame_map(window->frame);
 
+	{
+		// set custom color theme
+
+		libdecor_frame_set_value_color_argb(window->frame,
+						    "color/titlebar",
+						    1.0, 0.573, 0.573, 0.573);
+		libdecor_frame_set_value_color_argb(window->frame,
+						    "color/button/close",
+						    1.0, 0.875, 0.290, 0.086);
+	}
+
 	while (ret != -1)
 		ret = wl_display_dispatch(wl_display);
 
