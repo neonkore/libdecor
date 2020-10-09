@@ -41,8 +41,9 @@
 #include "utils.h"
 #include "cursor-settings.h"
 
-#define DEFAULT_WIDTH 800
-#define DEFAULT_HEIGHT 600
+static const size_t chk = 16;
+static const int DEFAULT_WIDTH = 30*chk;
+static const int DEFAULT_HEIGHT = 20*chk;
 
 static const char *proxy_tag = "libdecoration-demo";
 
@@ -614,7 +615,6 @@ paint_buffer(struct buffer *buffer,
 	int y, x, sx, sy;
 	size_t off;
 	int stride = width * scale;
-	const int chk = 16;
 
 	if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE) {
 		fg = 0xffbcbcbc;
