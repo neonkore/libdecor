@@ -15,7 +15,9 @@ libdecoration_sources = [
 libdecoration_headers = [
   'libdecoration.h',
 ]
-install_headers(libdecoration_headers, subdir : 'libdecoration')
+install_headers(libdecoration_headers,
+  subdir: '@0@'.format(libdecoration_full_name),
+)
 
 libdecoration_built_sources = []
 
@@ -78,7 +80,7 @@ cursor_settings_dep = declare_dependency(
 )
 
 ## core decoration library
-libdecoration = both_libraries('decoration',
+libdecoration = both_libraries(libdecoration_name,
   sources: [
     libdecoration_sources,
     libdecoration_built_sources,
@@ -115,4 +117,6 @@ pkg.generate(
   name: 'decoration',
   description: 'library for Wayland client-side window decorations',
   libraries: libdecoration,
-  version: meson.project_version())
+  subdirs: libdecoration_full_name,
+  version: meson.project_version()
+)

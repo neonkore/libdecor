@@ -4,6 +4,14 @@ project('libdecoration', 'c',
   license: 'MIT'
 )
 
+version_array = meson.project_version().split('.')
+
+libdecoration_api_version = version_array[0]
+libdecoration_api_version_string = '@0@'.format(libdecoration_api_version)
+
+libdecoration_name = 'decoration-' + libdecoration_api_version_string
+libdecoration_full_name = 'libdecoration-' + libdecoration_api_version_string
+
 cc = meson.get_compiler('c')
 
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
