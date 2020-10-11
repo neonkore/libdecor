@@ -297,9 +297,6 @@ closeable(struct libdecor_frame_cairo *frame_cairo) {
 					     LIBDECOR_ACTION_CLOSE);
 }
 
-struct libdecor_plugin *
-libdecor_plugin_new(struct libdecor *context);
-
 static void
 buffer_free(struct buffer *buffer);
 
@@ -2410,7 +2407,7 @@ static const struct wl_callback_listener globals_callback_listener = {
 	globals_callback
 };
 
-LIBDECOR_EXPORT struct libdecor_plugin *
+static struct libdecor_plugin *
 libdecor_plugin_new(struct libdecor *context)
 {
 	struct libdecor_plugin_cairo *plugin_cairo;
@@ -2444,3 +2441,9 @@ libdecor_plugin_new(struct libdecor *context)
 
 	return &plugin_cairo->plugin;
 }
+
+LIBDECOR_EXPORT const struct libdecor_plugin_description
+libdecoration_plugin_description = {
+	.description = "libdecoration plugin using Cairo",
+	.constructor = libdecor_plugin_new,
+};

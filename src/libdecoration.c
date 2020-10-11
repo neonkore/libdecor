@@ -996,7 +996,7 @@ load_plugin(struct libdecor *context,
 {
 	char *filename;
 	void *lib;
-	libdecor_plugin_constructor libdecor_plugin_constructor;
+	const struct libdecor_plugin_description *plugin_description;
 	struct libdecor_plugin *plugin;
 
 	if (asprintf(&filename, "%s/%s", path, name) == -1)
@@ -1009,16 +1009,16 @@ load_plugin(struct libdecor *context,
 		return NULL;
 	}
 
-	libdecor_plugin_constructor = dlsym(lib, "libdecor_plugin_new");
-	if (!libdecor_plugin_constructor) {
+	plugin_description = dlsym(lib, "libdecoration_plugin_description");
+	if (!plugin_description) {
 		dlclose(lib);
 		fprintf(stderr,
-			"Failed to load plugin '%s': no constructor symbol\n",
+			"Failed to load plugin '%s': no plugin description symbol\n",
 			name);
 		return NULL;
 	}
 
-	plugin = libdecor_plugin_constructor(context);
+	plugin = plugin_description->constructor(context);
 	if (!plugin) {
 		dlclose(lib);
 		fprintf(stderr,

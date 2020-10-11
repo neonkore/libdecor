@@ -45,6 +45,11 @@ struct libdecor_plugin {
 
 typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *context);
 
+struct libdecor_plugin_description {
+	char *description;
+	libdecor_plugin_constructor constructor;
+};
+
 struct libdecor_plugin_interface {
 	void (* destroy)(struct libdecor_plugin *plugin);
 
