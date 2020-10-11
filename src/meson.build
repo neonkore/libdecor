@@ -14,7 +14,6 @@ libdecoration_sources = [
 
 libdecoration_headers = [
   'libdecoration.h',
-  'libdecoration-plugin.h',
 ]
 install_headers(libdecoration_headers, subdir : 'libdecoration')
 
