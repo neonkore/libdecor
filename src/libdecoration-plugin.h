@@ -46,6 +46,7 @@ struct libdecor_plugin {
 typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *context);
 
 struct libdecor_plugin_description {
+	int api_version;
 	char *description;
 	libdecor_plugin_constructor constructor;
 };

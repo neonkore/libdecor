@@ -2444,6 +2444,7 @@ libdecor_plugin_new(struct libdecor *context)
 
 LIBDECOR_EXPORT const struct libdecor_plugin_description
 libdecoration_plugin_description = {
+	.api_version = LIBDECOR_PLUGIN_API_VERSION,
 	.description = "libdecoration plugin using Cairo",
 	.constructor = libdecor_plugin_new,
 };

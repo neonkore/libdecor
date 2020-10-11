@@ -1018,6 +1018,17 @@ load_plugin(struct libdecor *context,
 		return NULL;
 	}
 
+	if (plugin_description->api_version != LIBDECOR_PLUGIN_API_VERSION) {
+		dlclose(lib);
+		fprintf(stderr,
+			"Plugin '%s' found, but it's incompatible "
+			"(expected API version %d, but got %d)\n",
+			name,
+			LIBDECOR_PLUGIN_API_VERSION,
+			plugin_description->api_version);
+		return NULL;
+	}
+
 	plugin = plugin_description->constructor(context);
 	if (!plugin) {
 		dlclose(lib);

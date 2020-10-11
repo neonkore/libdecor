@@ -9,6 +9,9 @@ version_array = meson.project_version().split('.')
 libdecoration_api_version = version_array[0]
 libdecoration_api_version_string = '@0@'.format(libdecoration_api_version)
 
+plugin_api_version = 1
+plugin_api_version_string = '@0@'.format(plugin_api_version)
+
 libdecoration_name = 'decoration-' + libdecoration_api_version_string
 libdecoration_full_name = 'libdecoration-' + libdecoration_api_version_string
 
@@ -49,7 +52,7 @@ libdir = join_paths(prefix, get_option('libdir'))
 pkgname = meson.project_name()
 pkglibdir = join_paths(libdir, pkgname)
 
-plugindir = join_paths(pkglibdir, 'plugins')
+plugindir = join_paths(pkglibdir, 'plugins-@0@'.format(plugin_api_version_string))
 
 libdecoration_c_args = [
   '-fvisibility=hidden',
@@ -58,6 +61,7 @@ libdecoration_c_args = [
 cdata = configuration_data()
 cdata.set_quoted('VERSION', meson.project_version())
 cdata.set_quoted('LIBDECOR_PLUGIN_DIR', plugindir)
+cdata.set('LIBDECOR_PLUGIN_API_VERSION', plugin_api_version)
 if dbus_dep.found()
   cdata.set('HAS_DBUS', true)
 endif
