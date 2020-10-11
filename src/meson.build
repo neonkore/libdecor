@@ -114,7 +114,7 @@ subdir('plugins')
 
 ## pkg-config file
 pkg.generate(
-  name: 'decoration',
+  name: libdecoration_full_name,
   description: 'library for Wayland client-side window decorations',
   libraries: libdecoration,
   subdirs: libdecoration_full_name,
