@@ -22,8 +22,6 @@ wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protoco
 dbus_dep = dependency('dbus-1', version: dbus_req)
 dl_dep = cc.find_library('dl', required: true)
 wayland_egl_dep = dependency('wayland-egl')
-egl_dep = dependency('egl')
-gl_dep = dependency('gl')
 
 # list of (function, prefix)
 required_functions = [
@@ -62,4 +60,7 @@ config_h = configure_file(
 top_includepath = include_directories('.')
 
 subdir('src')
-subdir('demo')
+
+if get_option('demo')
+  subdir('demo')
+endif
