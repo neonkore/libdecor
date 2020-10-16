@@ -21,6 +21,8 @@ wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
 wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protocols_req)
 dl_dep = cc.find_library('dl', required: true)
 
+dbus_dep = dependency('dbus-1', version: dbus_req, required: get_option('dbus'))
+
 # list of (function, prefix)
 required_functions = [
   ['memfd_create', '#define _GNU_SOURCE\n#include <sys/mman.h>'],
@@ -49,7 +51,6 @@ cdata = configuration_data()
 cdata.set_quoted('VERSION', meson.project_version())
 cdata.set_quoted('LIBDECOR_PLUGIN_DIR', plugindir)
 if get_option('dbus')
-  dbus_dep = dependency('dbus-1', version: dbus_req)
   cdata.set('HAS_DBUS', true)
 endif
 
