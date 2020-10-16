@@ -21,7 +21,6 @@ wayland_client_dep = dependency('wayland-client', version: wayland_client_req)
 wayland_protocols_dep = dependency('wayland-protocols', version: wayland_protocols_req)
 dbus_dep = dependency('dbus-1', version: dbus_req)
 dl_dep = cc.find_library('dl', required: true)
-wayland_egl_dep = dependency('wayland-egl')
 
 # list of (function, prefix)
 required_functions = [

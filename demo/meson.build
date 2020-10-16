@@ -4,6 +4,7 @@ math_dep = cc.find_library('m')
 
 egl_dep = dependency('egl')
 gl_dep = dependency('gl')
+wayland_egl_dep = dependency('wayland-egl')
 
 executable('libdecor-demo',
   sources: [
