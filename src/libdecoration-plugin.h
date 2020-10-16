@@ -28,6 +28,7 @@
 #define LIBDECORATION_PLUGIN_H
 
 #include "libdecoration.h"
+#include "libdecoration-value.h"
 
 struct libdecor_frame_private;
 
@@ -61,6 +62,11 @@ struct libdecor_plugin_interface {
 						struct libdecor_frame *frame,
 						int *content_width,
 						int *content_height);
+
+	bool (* frame_set_value)(struct libdecor_plugin *plugin,
+				 struct libdecor_frame *frame,
+				 const char *key,
+				 const struct libdecor_value *value);
 };
 
 struct wl_surface *

@@ -202,6 +202,19 @@ libdecor_frame_close(struct libdecor_frame *frame);
 void
 libdecor_frame_map(struct libdecor_frame *frame);
 
+bool
+libdecor_frame_set_value_string(struct libdecor_frame *frame,
+				const char *key,
+				const char *value);
+
+bool
+libdecor_frame_set_value_color_argb(struct libdecor_frame *frame,
+				    const char *key,
+				    double alpha,
+				    double red,
+				    double green,
+				    double blue);
+
 struct xdg_surface *
 libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
 

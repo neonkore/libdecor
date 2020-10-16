@@ -10,6 +10,7 @@ libdecoration_includes = [
 libdecoration_sources = [
   'libdecoration.c',
   'libdecoration-fallback.c',
+  'libdecoration-value.c',
 ]
 
 libdecoration_headers = [

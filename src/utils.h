@@ -41,4 +41,13 @@ zalloc(size_t size)
 	return calloc(1, size);
 }
 
+#define DEFINE_AUTOCLEAN(_type, _cleanup_func) \
+        static inline void _cleanup_func ## p(_type **ptr) { \
+                if (*ptr) \
+                        _cleanup_func(*ptr); \
+        } struct require_semicolon
+
+#define AUTOPTR(_type, _cleanup_func) \
+        _type __attribute__((__cleanup__(_cleanup_func ## p)))
+
 #endif /* UTILS_H */

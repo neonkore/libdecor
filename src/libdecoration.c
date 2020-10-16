@@ -833,6 +833,44 @@ libdecor_frame_map(struct libdecor_frame *frame)
 	do_map(frame);
 }
 
+static bool
+libdecor_frame_set_value(struct libdecor_frame *frame,
+			 const char *key,
+			 const struct libdecor_value *value)
+{
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+
+	if (!plugin->iface->frame_set_value)
+		return false;
+
+	return plugin->iface->frame_set_value(plugin, frame, key, value);
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_set_value_string(struct libdecor_frame *frame,
+				const char *key,
+				const char *string)
+{
+	AUTOPTR(struct libdecor_value, libdecor_value_free) *value = NULL;
+
+	value = libdecor_value_new_string(string);
+	return libdecor_frame_set_value(frame, key, value);
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_set_value_color_argb(struct libdecor_frame *frame,
+				    const char *key,
+				    double alpha,
+				    double red,
+				    double green,
+				    double blue)
+{
+	AUTOPTR(struct libdecor_value, libdecor_value_free) *value = NULL;
+
+	value = libdecor_value_new_color_argb(alpha, red, green, blue);
+	return libdecor_frame_set_value(frame, key, value);
+}
+
 LIBDECOR_EXPORT struct wl_surface *
 libdecor_frame_get_wl_surface(struct libdecor_frame *frame)
 {
