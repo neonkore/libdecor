@@ -69,6 +69,7 @@ endforeach
 ## cursor settings
 cursor_settings = static_library('cursor_settings',
   sources: ['cursor-settings.c'],
+  include_directories: [top_includepath],
   dependencies: [dbus_dep],
 )
 

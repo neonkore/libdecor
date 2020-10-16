@@ -1,1 +1,3 @@
 option('demo', type: 'boolean', value: true, description: 'build cairo and EGL client examples')
+
+option('dbus', type: 'boolean', value: true, description: 'use D-Bus to fetch cursor settings')

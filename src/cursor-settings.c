@@ -1,8 +1,11 @@
 #include "cursor-settings.h"
-#include <dbus/dbus.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "config.h"
+
+#ifdef HAS_DBUS
+#include <dbus/dbus.h>
 
 static DBusMessage *
 get_setting_sync(DBusConnection *const connection,
@@ -113,3 +116,21 @@ libdecor_get_cursor_settings(char **theme, int *size)
 
 	return true;
 }
+#else
+bool
+libdecor_get_cursor_settings(char **theme, int *size)
+{
+	char *env_xtheme;
+	char *env_xsize;
+
+	env_xtheme = getenv("XCURSOR_THEME");
+	if (env_xtheme != NULL)
+		*theme = strdup(env_xtheme);
+
+	env_xsize = getenv("XCURSOR_SIZE");
+	if (env_xsize != NULL)
+		*size = atoi(env_xsize);
+
+	return env_xtheme != NULL && env_xsize != NULL;
+}
+#endif

@@ -3,3 +3,5 @@
 
 /* Plugin directiory path */
 #mesondefine LIBDECOR_PLUGIN_DIR
+
+#mesondefine HAS_DBUS
