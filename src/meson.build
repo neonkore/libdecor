@@ -92,6 +92,7 @@ libdecoration = both_libraries(libdecoration_name,
     dl_dep,
     cursor_settings_dep,
   ],
+  version: '@0@.@1@'.format(version_array[0], version_array[1]),
   install: true
 )
 
