@@ -10,7 +10,6 @@ shared_module('decoration-cairo',
   include_directories: [
     top_includepath,
     libdecoration_includepath,
-    include_directories('.'),
   ],
   c_args: libdecoration_c_args,
   dependencies: [
