@@ -117,6 +117,14 @@ struct seat {
 	struct wl_pointer *wl_pointer;
 
 	struct wl_surface *cursor_surface;
+	struct wl_cursor *current_cursor;
+	int cursor_scale;
+	struct wl_list cursor_outputs;
+
+	struct wl_cursor_theme *cursor_theme;
+	/* cursors for resize edges and corners */
+	struct wl_cursor *cursors[ARRAY_LENGTH(cursor_names)];
+	struct wl_cursor *cursor_left_ptr;
 
 	struct wl_surface *pointer_focus;
 
@@ -163,6 +171,11 @@ struct border_component {
 };
 
 struct surface_output {
+	struct output *output;
+	struct wl_list link;
+};
+
+struct cursor_output {
 	struct output *output;
 	struct wl_list link;
 };
@@ -216,23 +229,28 @@ struct libdecor_plugin_cairo {
 	struct wl_list seat_list;
 	struct wl_list output_list;
 
-	struct wl_cursor_theme *cursor_theme;
 	char *cursor_theme_name;
 	int cursor_size;
-
-	/* cursors for resize edges and corners */
-	struct wl_cursor *cursors[ARRAY_LENGTH(cursor_names)];
-
-	struct wl_cursor *cursor_left_ptr;
 };
 
 static const char *libdecoration_cairo_proxy_tag = "libdecoration-cairo";
 
 static bool
+own_proxy(struct wl_proxy *proxy)
+{
+	return (wl_proxy_get_tag(proxy) == &libdecoration_cairo_proxy_tag);
+}
+
+static bool
 own_surface(struct wl_surface *surface)
 {
-	return (wl_proxy_get_tag((struct wl_proxy *) surface) ==
-		&libdecoration_cairo_proxy_tag);
+	return own_proxy((struct wl_proxy *) surface);
+}
+
+static bool
+own_output(struct wl_output *output)
+{
+	return own_proxy((struct wl_proxy *) output);
 }
 
 static bool
@@ -271,6 +289,12 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 		      enum component component);
 
 static void
+send_cursor(struct seat *seat);
+
+static bool
+update_local_cursor(struct seat *seat);
+
+static void
 libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 {
 	struct libdecor_plugin_cairo *plugin_cairo =
@@ -293,6 +317,9 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 		if (seat->cursor_surface)
 			wl_surface_destroy(seat->cursor_surface);
 		wl_seat_destroy(seat->wl_seat);
+		if (seat->cursor_theme)
+			wl_cursor_theme_destroy(seat->cursor_theme);
+
 		free(seat);
 	}
 
@@ -306,9 +333,6 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 			      &plugin_cairo->visible_frame_list, link) {
 		wl_list_remove(&frame->link);
 	}
-
-	if (plugin_cairo->cursor_theme)
-		wl_cursor_theme_destroy(plugin_cairo->cursor_theme);
 
 	free(plugin_cairo->cursor_theme_name);
 
@@ -601,12 +625,33 @@ redraw_scale(struct libdecor_frame_cairo *frame_cairo,
 	return false;
 }
 
+static bool
+add_surface_output(struct libdecor_plugin_cairo *plugin_cairo,
+		   struct wl_output *wl_output,
+		   struct wl_list *list)
+{
+	struct output *output;
+	struct surface_output *surface_output;
+
+	if (!own_output(wl_output))
+		return false;
+
+	output = wl_output_get_user_data(wl_output);
+
+	if (output == NULL)
+		return false;
+
+	surface_output = zalloc(sizeof *surface_output);
+	surface_output->output = output;
+	wl_list_insert(list, &surface_output->link);
+	return true;
+}
+
 static void
 surface_enter(void *data,
 	      struct wl_surface *wl_surface,
 	      struct wl_output *wl_output)
 {
-	struct surface_output *surface_output;
 	struct libdecor_frame_cairo *frame_cairo = data;
 	struct border_component *cmpnt;
 
@@ -614,17 +659,26 @@ surface_enter(void *data,
 	if (cmpnt == NULL)
 		return;
 
-	surface_output = zalloc(sizeof *surface_output);
-	surface_output->output = wl_output_get_user_data(wl_output);
-
-	if (surface_output->output == NULL) {
-		free(surface_output);
+	if (!add_surface_output(frame_cairo->plugin_cairo, wl_output,
+				&cmpnt->output_list))
 		return;
-	}
 
-	wl_list_insert(&cmpnt->output_list, &surface_output->link);
 	if (redraw_scale(frame_cairo, cmpnt))
 		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+}
+
+static bool
+remove_surface_output(struct wl_list *list, struct wl_output *wl_output)
+{
+	struct surface_output *surface_output;
+	wl_list_for_each(surface_output, list, link) {
+		if (surface_output->output->wl_output == wl_output) {
+			wl_list_remove(&surface_output->link);
+			free(surface_output);
+			return true;
+		}
+	}
+	return false;
 }
 
 static void
@@ -632,7 +686,6 @@ surface_leave(void *data,
 	      struct wl_surface *wl_surface,
 	      struct wl_output *wl_output)
 {
-	struct surface_output *surface_output;
 	struct libdecor_frame_cairo *frame_cairo = data;
 	struct border_component *cmpnt;
 
@@ -640,16 +693,11 @@ surface_leave(void *data,
 	if (cmpnt == NULL)
 		return;
 
-	wl_list_for_each(surface_output, &cmpnt->output_list, link) {
-		if (surface_output->output->wl_output == wl_output) {
-			wl_list_remove(&surface_output->link);
-			free(surface_output);
-			if (redraw_scale(frame_cairo, cmpnt))
-				libdecor_frame_toplevel_commit(
-					&frame_cairo->frame);
-			break;
-		}
-	}
+	if (!remove_surface_output(&cmpnt->output_list, wl_output))
+		return;
+
+	if (redraw_scale(frame_cairo, cmpnt))
+		libdecor_frame_toplevel_commit(&frame_cairo->frame);
 }
 
 static struct wl_surface_listener surface_listener = {
@@ -1041,8 +1089,9 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 	wl_surface_set_buffer_scale(border_component->wl_surface, buffer->scale);
 	buffer->in_use = true;
 	wl_surface_commit(border_component->wl_surface);
-	wl_surface_damage(border_component->wl_surface,
-			  0, 0, component_width, component_height);
+	wl_surface_damage_buffer(border_component->wl_surface, 0, 0,
+				 component_width * scale,
+				 component_height * scale);
 	wl_subsurface_set_position(border_component->wl_subsurface,
 				   component_x, component_y);
 
@@ -1345,6 +1394,49 @@ init_wl_shm(struct libdecor_plugin_cairo *plugin_cairo,
 }
 
 static void
+cursor_surface_enter(void *data,
+		     struct wl_surface *wl_surface,
+		     struct wl_output *wl_output)
+{
+	struct seat *seat = data;
+
+	if(own_output(wl_output)) {
+		struct cursor_output *cursor_output;
+		cursor_output = zalloc(sizeof *cursor_output);
+		cursor_output->output = wl_output_get_user_data(wl_output);;
+		wl_list_insert(&seat->cursor_outputs, &cursor_output->link);
+		if (update_local_cursor(seat))
+			send_cursor(seat);
+	}
+}
+
+static void
+cursor_surface_leave(void *data,
+		     struct wl_surface *wl_surface,
+		     struct wl_output *wl_output)
+{
+	struct seat *seat = data;
+
+	if(own_output(wl_output)) {
+		struct cursor_output *cursor_output;
+		wl_list_for_each(cursor_output, &seat->cursor_outputs, link) {
+			if (cursor_output->output->wl_output == wl_output) {
+				wl_list_remove(&cursor_output->link);
+				free(cursor_output);
+			}
+		}
+
+		if (update_local_cursor(seat))
+			send_cursor(seat);
+	}
+}
+
+static struct wl_surface_listener cursor_surface_listener = {
+	cursor_surface_enter,
+	cursor_surface_leave,
+};
+
+static void
 ensure_cursor_surface(struct seat *seat)
 {
 	struct wl_compositor *wl_compositor = seat->plugin_cairo->wl_compositor;
@@ -1353,26 +1445,48 @@ ensure_cursor_surface(struct seat *seat)
 		return;
 
 	seat->cursor_surface = wl_compositor_create_surface(wl_compositor);
+	wl_surface_add_listener(seat->cursor_surface,
+				&cursor_surface_listener, seat);
 }
 
-static void
-ensure_cursor_theme(struct libdecor_plugin_cairo *plugin_cairo)
+static bool
+ensure_cursor_theme(struct seat *seat)
 {
-	if (!plugin_cairo->cursor_theme)
-		plugin_cairo->cursor_theme = wl_cursor_theme_load(
-						     plugin_cairo->cursor_theme_name,
-						     plugin_cairo->cursor_size,
-						     plugin_cairo->wl_shm);
+	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
+	int scale = 1;
+	struct wl_cursor_theme *theme;
+	struct cursor_output *cursor_output;
+
+	wl_list_for_each(cursor_output, &seat->cursor_outputs, link) {
+		scale = MAX(scale, cursor_output->output->scale);
+	}
+
+	if (seat->cursor_theme && seat->cursor_scale == scale)
+		return false;
+
+	seat->cursor_scale = scale;
+	theme = wl_cursor_theme_load(plugin_cairo->cursor_theme_name,
+				     plugin_cairo->cursor_size * scale,
+				     plugin_cairo->wl_shm);
+	if (theme == NULL)
+		return false;
+
+	if (seat->cursor_theme)
+		wl_cursor_theme_destroy(seat->cursor_theme);
+
+	seat->cursor_theme = theme;
 
 	for (unsigned int i = 0; i < ARRAY_LENGTH(cursor_names); i++) {
-		plugin_cairo->cursors[i] = wl_cursor_theme_get_cursor(
-						   plugin_cairo->cursor_theme,
+		seat->cursors[i] = wl_cursor_theme_get_cursor(
+						   seat->cursor_theme,
 						   cursor_names[i]);
 	}
 
-	plugin_cairo->cursor_left_ptr =
-		wl_cursor_theme_get_cursor(plugin_cairo->cursor_theme,
-					   "left_ptr");
+	seat->cursor_left_ptr = wl_cursor_theme_get_cursor(seat->cursor_theme,
+							   "left_ptr");
+	seat->current_cursor = seat->cursor_left_ptr;
+
+	return true;
 }
 
 enum libdecor_resize_edge
@@ -1408,55 +1522,74 @@ component_edge(const struct border_component *cmpnt,
 		return LIBDECOR_RESIZE_EDGE_NONE;
 }
 
-void
-set_cursor(struct seat *seat, struct wl_pointer *wl_pointer)
+static bool
+update_local_cursor(struct seat *seat)
 {
-	if (!seat->pointer_focus)
-		return;
+	if (!seat->pointer_focus) {
+		seat->current_cursor = seat->cursor_left_ptr;
+		return false;
+	}
 
-	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
+	if (!own_surface(seat->pointer_focus))
+		return false;
+
 	struct libdecor_frame_cairo *frame_cairo =
 			wl_surface_get_user_data(seat->pointer_focus);
 	struct wl_cursor *wl_cursor = NULL;
 	enum libdecor_resize_edge edge = LIBDECOR_RESIZE_EDGE_NONE;
-	struct wl_cursor_image *image;
-	struct wl_buffer *buffer;
 
-	if (!frame_cairo || !frame_cairo->active)
-		return;
+	if (!frame_cairo || !frame_cairo->active) {
+		seat->current_cursor = seat->cursor_left_ptr;
+		return false;
+	}
+
+	bool theme_updated = ensure_cursor_theme(seat);
 
 	switch (frame_cairo->active->type) {
-	case NONE:
-		wl_cursor = NULL;
-		break;
 	case SHADOW:
 		edge = component_edge(frame_cairo->active, seat->pointer_x,
 				      seat->pointer_y, SHADOW_MARGIN);
 		break;
+	case NONE:
 	case TITLE:
 	case BUTTON_MIN:
 	case BUTTON_MAX:
 	case BUTTON_CLOSE:
-		wl_cursor = plugin_cairo->cursor_left_ptr;
+		wl_cursor = seat->cursor_left_ptr;
 		break;
 	}
 
-	if (edge != LIBDECOR_RESIZE_EDGE_NONE && resizable(frame_cairo))
-		wl_cursor = plugin_cairo->cursors[edge-1];
+	if (edge != LIBDECOR_RESIZE_EDGE_NONE)
+		wl_cursor = seat->cursors[edge-1];
 
-	if (wl_cursor == NULL)
+	if (seat->current_cursor != wl_cursor) {
+		seat->current_cursor = wl_cursor;
+		return true;
+	}
+	return theme_updated;
+}
+
+static void
+send_cursor(struct seat *seat)
+{
+	struct wl_cursor_image *image;
+	struct wl_buffer *buffer;
+
+	if (seat->pointer_focus == NULL || seat->current_cursor == NULL)
 		return;
 
-	image = wl_cursor->images[0];
+	image = seat->current_cursor->images[0];
 	buffer = wl_cursor_image_get_buffer(image);
-	wl_pointer_set_cursor(wl_pointer, seat->serial,
-			      seat->cursor_surface,
-			      image->hotspot_x,
-			      image->hotspot_y);
 	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
-	wl_surface_damage(seat->cursor_surface, 0, 0,
-			  image->width, image->height);
+	wl_surface_set_buffer_scale(seat->cursor_surface, seat->cursor_scale);
+	wl_surface_damage_buffer(seat->cursor_surface, 0, 0,
+				 image->width * seat->cursor_scale,
+				 image->height * seat->cursor_scale);
 	wl_surface_commit(seat->cursor_surface);
+	wl_pointer_set_cursor(seat->wl_pointer, seat->serial,
+			      seat->cursor_surface,
+			      image->hotspot_x / seat->cursor_scale,
+			      image->hotspot_y / seat->cursor_scale);
 }
 
 static void
@@ -1471,7 +1604,6 @@ pointer_enter(void *data,
 		return;
 
 	struct seat *seat = data;
-	struct libdecor_plugin_cairo *plugin_cairo = seat->plugin_cairo;
 	struct libdecor_frame_cairo *frame_cairo;
 
 	if (!own_surface(surface))
@@ -1480,7 +1612,6 @@ pointer_enter(void *data,
 	frame_cairo = wl_surface_get_user_data(surface);
 
 	ensure_cursor_surface(seat);
-	ensure_cursor_theme(plugin_cairo);
 
 	seat->pointer_x = wl_fixed_to_int(surface_x);
 	seat->pointer_y = wl_fixed_to_int(surface_y);
@@ -1498,7 +1629,8 @@ pointer_enter(void *data,
 		libdecor_frame_toplevel_commit(&frame_cairo->frame);
 	}
 
-	set_cursor(seat, wl_pointer);
+	update_local_cursor(seat);
+	send_cursor(seat);
 }
 
 static void
@@ -1523,6 +1655,7 @@ pointer_leave(void *data,
 		frame_cairo->active = NULL;
 		draw_decoration(frame_cairo);
 		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+		update_local_cursor(seat);
 	}
 }
 
@@ -1537,7 +1670,8 @@ pointer_motion(void *data,
 
 	seat->pointer_x = wl_fixed_to_int(surface_x);
 	seat->pointer_y = wl_fixed_to_int(surface_y);
-	set_cursor(seat, wl_pointer);
+	if (update_local_cursor(seat))
+		send_cursor(seat);
 }
 
 static void
@@ -1693,7 +1827,9 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 	}
 
 	seat = zalloc(sizeof *seat);
+	seat->cursor_scale = 1;
 	seat->plugin_cairo = plugin_cairo;
+	wl_list_init(&seat->cursor_outputs);
 	wl_list_insert(&plugin_cairo->seat_list, &seat->link);
 	seat->wl_seat =
 		wl_registry_bind(plugin_cairo->wl_registry,
@@ -1731,6 +1867,7 @@ output_done(void *data,
 {
 	struct output *output = data;
 	struct libdecor_frame_cairo *frame_cairo;
+	struct seat *seat;
 
 	wl_list_for_each(frame_cairo,
 			&output->plugin_cairo->visible_frame_list, link) {
@@ -1742,6 +1879,10 @@ output_done(void *data,
 		updated |= redraw_scale(frame_cairo, &frame_cairo->title_bar.close);
 		if (updated)
 			libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	}
+	wl_list_for_each(seat, &output->plugin_cairo->seat_list, link) {
+		if (update_local_cursor(seat))
+			send_cursor(seat);
 	}
 }
 
@@ -1788,6 +1929,8 @@ init_wl_output(struct libdecor_plugin_cairo *plugin_cairo,
 	output->wl_output =
 		wl_registry_bind(plugin_cairo->wl_registry,
 				 id, &wl_output_interface, 2);
+	wl_proxy_set_tag((struct wl_proxy *) output->wl_output,
+			 &libdecoration_cairo_proxy_tag);
 	wl_output_add_listener(output->wl_output, &output_listener, output);
 }
 
@@ -1838,6 +1981,15 @@ output_removed(struct libdecor_plugin_cairo *plugin_cairo,
 		remove_surface_outputs(&frame_cairo->title_bar.min, output);
 		remove_surface_outputs(&frame_cairo->title_bar.max, output);
 		remove_surface_outputs(&frame_cairo->title_bar.close, output);
+	}
+	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+		struct cursor_output *cursor_output;
+		wl_list_for_each(cursor_output, &seat->cursor_outputs, link) {
+			if (cursor_output->output == output) {
+				wl_list_remove(&cursor_output->link);
+				free(cursor_output);
+			}
+		}
 	}
 
 	wl_list_remove(&output->link);
@@ -1912,7 +2064,6 @@ libdecor_plugin_new(struct libdecor *context)
 	plugin_cairo = zalloc(sizeof *plugin_cairo);
 	plugin_cairo->plugin.iface = &cairo_plugin_iface;
 	plugin_cairo->context = context;
-	plugin_cairo->cursor_theme = NULL;
 
 	wl_list_init(&plugin_cairo->visible_frame_list);
 	wl_list_init(&plugin_cairo->seat_list);
