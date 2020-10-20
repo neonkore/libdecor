@@ -655,6 +655,9 @@ surface_enter(void *data,
 	struct libdecor_frame_cairo *frame_cairo = data;
 	struct border_component *cmpnt;
 
+	if (!(own_surface(wl_surface) && own_output(wl_output)))
+	    return;
+
 	cmpnt = get_component_for_surface(frame_cairo, wl_surface);
 	if (cmpnt == NULL)
 		return;
@@ -688,6 +691,9 @@ surface_leave(void *data,
 {
 	struct libdecor_frame_cairo *frame_cairo = data;
 	struct border_component *cmpnt;
+
+	if (!(own_surface(wl_surface) && own_output(wl_output)))
+	    return;
 
 	cmpnt = get_component_for_surface(frame_cairo, wl_surface);
 	if (cmpnt == NULL)
