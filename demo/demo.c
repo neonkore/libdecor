@@ -174,9 +174,9 @@ cursor_surface_leave(void *data,
 	      struct wl_output *wl_output)
 {
 	struct seat *seat = data;
-	struct pointer_output *pointer_output;
+	struct pointer_output *pointer_output, *tmp;
 
-	wl_list_for_each(pointer_output, &seat->pointer_outputs, link) {
+	wl_list_for_each_safe(pointer_output, tmp, &seat->pointer_outputs, link) {
 		if (pointer_output->output->wl_output == wl_output) {
 			wl_list_remove(&pointer_output->link);
 			free(pointer_output);
