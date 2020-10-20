@@ -1403,7 +1403,7 @@ cursor_surface_enter(void *data,
 	if(own_output(wl_output)) {
 		struct cursor_output *cursor_output;
 		cursor_output = zalloc(sizeof *cursor_output);
-		cursor_output->output = wl_output_get_user_data(wl_output);;
+		cursor_output->output = wl_output_get_user_data(wl_output);
 		wl_list_insert(&seat->cursor_outputs, &cursor_output->link);
 		if (update_local_cursor(seat))
 			send_cursor(seat);
