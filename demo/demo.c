@@ -226,7 +226,7 @@ set_cursor(struct seat *seat)
 	struct wl_cursor *wl_cursor;
 	struct wl_cursor_image *image;
 	struct wl_buffer *buffer;
-	int scale = seat->pointer_scale;
+	const int scale = seat->pointer_scale;
 
 	if (!seat->cursor_theme)
 		return;
@@ -240,6 +240,7 @@ set_cursor(struct seat *seat)
 			      image->hotspot_x / scale,
 			      image->hotspot_y / scale);
 	wl_surface_attach(seat->cursor_surface, buffer, 0, 0);
+	wl_surface_set_buffer_scale(seat->cursor_surface, scale);
 	wl_surface_damage_buffer(seat->cursor_surface, 0, 0,
 				 image->width, image->height);
 	wl_surface_commit(seat->cursor_surface);
