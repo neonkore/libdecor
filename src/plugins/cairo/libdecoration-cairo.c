@@ -1418,8 +1418,8 @@ cursor_surface_leave(void *data,
 	struct seat *seat = data;
 
 	if(own_output(wl_output)) {
-		struct cursor_output *cursor_output;
-		wl_list_for_each(cursor_output, &seat->cursor_outputs, link) {
+		struct cursor_output *cursor_output, *tmp;
+		wl_list_for_each_safe(cursor_output, tmp, &seat->cursor_outputs, link) {
 			if (cursor_output->output->wl_output == wl_output) {
 				wl_list_remove(&cursor_output->link);
 				free(cursor_output);
