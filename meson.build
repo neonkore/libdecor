@@ -1,6 +1,6 @@
 project('libdecoration', 'c',
   version: '0.0.1',
-  meson_version: '>= 0.46.0',
+  meson_version: '>= 0.47.0',
   license: 'MIT'
 )
 
@@ -50,7 +50,7 @@ libdecoration_c_args = [
 cdata = configuration_data()
 cdata.set_quoted('VERSION', meson.project_version())
 cdata.set_quoted('LIBDECOR_PLUGIN_DIR', plugindir)
-if get_option('dbus')
+if dbus_dep.found()
   cdata.set('HAS_DBUS', true)
 endif
 
