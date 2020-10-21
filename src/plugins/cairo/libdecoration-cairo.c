@@ -312,6 +312,8 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 	wl_registry_destroy(plugin_cairo->wl_registry);
 
 	wl_list_for_each_safe(seat, seat_tmp, &plugin_cairo->seat_list, link) {
+		struct cursor_output *cursor_output, *tmp;
+
 		if (seat->wl_pointer)
 			wl_pointer_destroy(seat->wl_pointer);
 		if (seat->cursor_surface)
@@ -319,6 +321,11 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 		wl_seat_destroy(seat->wl_seat);
 		if (seat->cursor_theme)
 			wl_cursor_theme_destroy(seat->cursor_theme);
+
+		wl_list_for_each_safe(cursor_output, tmp, &seat->cursor_outputs, link) {
+			wl_list_remove(&cursor_output->link);
+			free(cursor_output);
+		}
 
 		free(seat);
 	}
