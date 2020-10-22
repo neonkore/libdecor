@@ -847,6 +847,8 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
 static void
 draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		       struct buffer *buffer,
+		       int component_width,
+		       int component_height,
 		       enum component component)
 {
 	cairo_surface_t *surface;
@@ -861,6 +863,10 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	/* title fade out at buttons */
 	const int fade_width = 5 * BUTTON_WIDTH;
 	int fade_start;
+	const char *title_text;
+	cairo_text_extents_t text_extents;
+	double text_x;
+	double text_fade_overlap;
 	cairo_pattern_t *fade;
 
 	bool cap_min, cap_max, cap_close;
@@ -937,9 +943,16 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 				       CAIRO_FONT_WEIGHT_BOLD);
 		cairo_set_font_size(cr, SYM_DIM);
 		cairo_set_rgba32(cr, &COL_SYM);
-		cairo_move_to(cr, BUTTON_WIDTH, y + SYM_DIM - 1);
-		cairo_show_text(cr, libdecor_frame_get_title(
-					(struct libdecor_frame*)frame_cairo));
+		title_text = libdecor_frame_get_title(
+			(struct libdecor_frame*) frame_cairo);
+		cairo_text_extents (cr, title_text, &text_extents);
+		text_x = component_width / 2.0 - text_extents.width / 2;
+		text_fade_overlap = ((component_width - fade_width) -
+				     (text_x + text_extents.width));
+		text_x += MIN (0.0, text_fade_overlap);
+		text_x = MAX (text_x, BUTTON_WIDTH);
+		cairo_move_to(cr, text_x, y + SYM_DIM - 1);
+		cairo_show_text(cr, title_text);
 		fade_start = libdecor_frame_get_content_width(
 				(struct libdecor_frame *)frame_cairo)-fade_width;
 		fade = cairo_pattern_create_linear(
@@ -1098,7 +1111,9 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 					   component_height,
 					   border_component->scale);
 
-	draw_component_content(frame_cairo, buffer, component);
+	draw_component_content(frame_cairo, buffer,
+			       component_width, component_height,
+			       component);
 
 	wl_surface_attach(border_component->wl_surface, buffer->wl_buffer, 0, 0);
 	wl_surface_set_buffer_scale(border_component->wl_surface, buffer->scale);
