@@ -626,8 +626,10 @@ redraw_scale(struct libdecor_frame_cairo *frame_cairo,
 	}
 	if (scale != cmpnt->scale) {
 		cmpnt->scale = scale;
-		draw_border_component(frame_cairo, cmpnt, cmpnt->type);
-		return true;
+		if ((cmpnt->type != SHADOW) || is_border_surfaces_showing(frame_cairo)) {
+			draw_border_component(frame_cairo, cmpnt, cmpnt->type);
+			return true;
+		}
 	}
 	return false;
 }
