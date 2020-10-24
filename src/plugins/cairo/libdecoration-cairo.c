@@ -1593,7 +1593,7 @@ update_local_cursor(struct seat *seat)
 		break;
 	}
 
-	if (edge != LIBDECOR_RESIZE_EDGE_NONE)
+	if (edge != LIBDECOR_RESIZE_EDGE_NONE && resizable(frame_cairo))
 		wl_cursor = seat->cursors[edge-1];
 
 	if (seat->current_cursor != wl_cursor) {
