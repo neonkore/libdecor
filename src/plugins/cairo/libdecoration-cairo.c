@@ -166,6 +166,7 @@ struct border_component {
 	struct wl_surface *wl_surface;
 	struct wl_subsurface *wl_subsurface;
 	struct buffer *buffer;
+	bool opaque;
 	struct wl_list output_list;
 	int scale;
 };
@@ -447,12 +448,14 @@ static struct buffer *
 create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 		  int width,
 		  int height,
+		  bool opaque,
 		  int scale)
 {
 	struct wl_shm_pool *pool;
 	int fd, size, buffer_width, buffer_height, stride;
 	void *data;
 	struct buffer *buffer;
+	enum wl_shm_format buf_fmt;
 
 	buffer_width = width * scale;
 	buffer_height = height * scale;
@@ -473,12 +476,14 @@ create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 		return NULL;
 	}
 
+	buf_fmt = opaque ? WL_SHM_FORMAT_XRGB8888 : WL_SHM_FORMAT_ARGB8888;
+
 	pool = wl_shm_create_pool(plugin_cairo->wl_shm, fd, size);
 	buffer = zalloc(sizeof *buffer);
 	buffer->wl_buffer = wl_shm_pool_create_buffer(pool, 0,
 						      buffer_width, buffer_height,
 						      stride,
-						      WL_SHM_FORMAT_ARGB8888);
+						      buf_fmt);
 	wl_buffer_add_listener(buffer->wl_buffer, &buffer_listener, buffer);
 	wl_shm_pool_destroy(pool);
 	close(fd);
@@ -765,6 +770,7 @@ static void
 ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
 	frame_cairo->shadow.type = SHADOW;
+	frame_cairo->shadow.opaque = false;
 	ensure_component(frame_cairo, &frame_cairo->shadow);
 
 	libdecor_frame_set_min_content_size(&frame_cairo->frame,
@@ -776,15 +782,19 @@ static void
 ensure_title_bar_surfaces(struct libdecor_frame_cairo *frame_cairo)
 {
 	frame_cairo->title_bar.title.type = TITLE;
+	frame_cairo->title_bar.title.opaque = true;
 	ensure_component(frame_cairo, &frame_cairo->title_bar.title);
 
 	frame_cairo->title_bar.min.type = BUTTON_MIN;
+	frame_cairo->title_bar.min.opaque = true;
 	ensure_component(frame_cairo, &frame_cairo->title_bar.min);
 
 	frame_cairo->title_bar.max.type = BUTTON_MAX;
+	frame_cairo->title_bar.max.opaque = true;
 	ensure_component(frame_cairo, &frame_cairo->title_bar.max);
 
 	frame_cairo->title_bar.close.type = BUTTON_CLOSE;
+	frame_cairo->title_bar.close.opaque = true;
 	ensure_component(frame_cairo, &frame_cairo->title_bar.close);
 }
 
@@ -1113,6 +1123,7 @@ draw_border_component(struct libdecor_frame_cairo *frame_cairo,
 		buffer = create_shm_buffer(plugin_cairo,
 					   component_width,
 					   component_height,
+					   border_component->opaque,
 					   border_component->scale);
 
 	draw_component_content(frame_cairo, buffer,
