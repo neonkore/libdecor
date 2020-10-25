@@ -1581,7 +1581,6 @@ update_local_cursor(struct seat *seat)
 	struct libdecor_frame_cairo *frame_cairo =
 			wl_surface_get_user_data(seat->pointer_focus);
 	struct wl_cursor *wl_cursor = NULL;
-	enum libdecor_resize_edge edge = LIBDECOR_RESIZE_EDGE_NONE;
 
 	if (!frame_cairo || !frame_cairo->active) {
 		seat->current_cursor = seat->cursor_left_ptr;
@@ -1590,27 +1589,25 @@ update_local_cursor(struct seat *seat)
 
 	bool theme_updated = ensure_cursor_theme(seat);
 
-	switch (frame_cairo->active->type) {
-	case SHADOW:
-		edge = component_edge(frame_cairo->active, seat->pointer_x,
+	if (frame_cairo->active->type == SHADOW &&
+	    is_border_surfaces_showing(frame_cairo) &&
+	    resizable(frame_cairo)) {
+		enum libdecor_resize_edge edge;
+		edge = component_edge(frame_cairo->active,
+				      seat->pointer_x,
 				      seat->pointer_y, SHADOW_MARGIN);
-		break;
-	case NONE:
-	case TITLE:
-	case BUTTON_MIN:
-	case BUTTON_MAX:
-	case BUTTON_CLOSE:
-		wl_cursor = seat->cursor_left_ptr;
-		break;
-	}
 
-	if (edge != LIBDECOR_RESIZE_EDGE_NONE && resizable(frame_cairo))
-		wl_cursor = seat->cursors[edge-1];
+		if (edge != LIBDECOR_RESIZE_EDGE_NONE)
+			wl_cursor = seat->cursors[edge - 1];
+	} else {
+		wl_cursor = seat->cursor_left_ptr;
+	}
 
 	if (seat->current_cursor != wl_cursor) {
 		seat->current_cursor = wl_cursor;
 		return true;
 	}
+
 	return theme_updated;
 }
 
