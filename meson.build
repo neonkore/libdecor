@@ -1,4 +1,4 @@
-project('libdecoration', 'c',
+project('libdecor', 'c',
   version: '0.0.1',
   meson_version: '>= 0.47.0',
   license: 'MIT'
@@ -6,14 +6,14 @@ project('libdecoration', 'c',
 
 version_array = meson.project_version().split('.')
 
-libdecoration_api_version = version_array[0]
-libdecoration_api_version_string = '@0@'.format(libdecoration_api_version)
+libdecor_api_version = version_array[0]
+libdecor_api_version_string = '@0@'.format(libdecor_api_version)
 
 plugin_api_version = 1
 plugin_api_version_string = '@0@'.format(plugin_api_version)
 
-libdecoration_name = 'decoration-' + libdecoration_api_version_string
-libdecoration_full_name = 'libdecoration-' + libdecoration_api_version_string
+libdecor_name = 'decor-' + libdecor_api_version_string
+libdecor_full_name = 'libdecor-' + libdecor_api_version_string
 
 cc = meson.get_compiler('c')
 
@@ -54,7 +54,7 @@ pkglibdir = join_paths(libdir, pkgname)
 
 plugindir = join_paths(pkglibdir, 'plugins-@0@'.format(plugin_api_version_string))
 
-libdecoration_c_args = [
+libdecor_c_args = [
   '-fvisibility=hidden',
 ]
 

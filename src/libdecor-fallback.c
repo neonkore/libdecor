@@ -25,7 +25,7 @@
 
 #include "config.h"
 
-#include "libdecoration-fallback.h"
+#include "libdecor-fallback.h"
 #include "utils.h"
 
 static void

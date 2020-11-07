@@ -23,13 +23,13 @@
  * SOFTWARE.
  */
 
-#ifndef LIBDECORATION_FALLBACK_H
-#define LIBDECORATION_FALLBACK_H
+#ifndef LIBDECOR_FALLBACK_H
+#define LIBDECOR_FALLBACK_H
 
-#include "libdecoration.h"
-#include "libdecoration-plugin.h"
+#include "libdecor.h"
+#include "libdecor-plugin.h"
 
 struct libdecor_plugin *
 libdecor_fallback_plugin_new(struct libdecor *context);
 
-#endif /* LIBDECORATION_FALLBACK_H */
+#endif /* LIBDECOR_FALLBACK_H */

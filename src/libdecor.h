@@ -24,8 +24,8 @@
  * SOFTWARE.
  */
 
-#ifndef LIBDECORATION_H
-#define LIBDECORATION_H
+#ifndef LIBDECOR_H
+#define LIBDECOR_H
 
 #include <stdbool.h>
 #include <wayland-client.h>
@@ -235,4 +235,4 @@ libdecor_configuration_get_window_state(struct libdecor_configuration *configura
 }
 #endif
 
-#endif /* LIBDECORATION_H */
+#endif /* LIBDECOR_H */

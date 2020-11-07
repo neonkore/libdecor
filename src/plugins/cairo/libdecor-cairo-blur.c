@@ -29,7 +29,7 @@
  * https://gitlab.freedesktop.org/wayland/weston/raw/master/shared/cairo-util.c
  */
 
-#include "libdecoration-cairo-blur.h"
+#include "libdecor-cairo-blur.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>

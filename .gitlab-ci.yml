@@ -3,7 +3,7 @@ image: registry.gitlab.gnome.org/gnome/mutter/master:v4
 stages:
  - build
 
-build-libdecoration:
+build-libdecor:
   stage: build
   script:
     - meson . build -Dbuildtype=debugoptimized -Dwarning_level=2 --werror --prefix /usr

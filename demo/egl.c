@@ -33,7 +33,7 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include <libdecoration.h>
+#include <libdecor.h>
 #include <GL/gl.h>
 #include <utils.h>
 

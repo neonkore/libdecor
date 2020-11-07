@@ -35,13 +35,13 @@
 #include <limits.h>
 #include <wayland-cursor.h>
 
-#include "libdecoration-plugin.h"
+#include "libdecor-plugin.h"
 #include "utils.h"
 #include "cursor-settings.h"
 
 #include <cairo/cairo.h>
 
-#include "libdecoration-cairo-blur.h"
+#include "libdecor-cairo-blur.h"
 
 static const size_t SHADOW_MARGIN = 24;	/* graspable part of the border */
 static const size_t TITLE_HEIGHT = 24;
@@ -253,12 +253,12 @@ struct libdecor_plugin_cairo {
 	int cursor_size;
 };
 
-static const char *libdecoration_cairo_proxy_tag = "libdecoration-cairo";
+static const char *libdecor_cairo_proxy_tag = "libdecor-cairo";
 
 static bool
 own_proxy(struct wl_proxy *proxy)
 {
-	return (wl_proxy_get_tag(proxy) == &libdecoration_cairo_proxy_tag);
+	return (wl_proxy_get_tag(proxy) == &libdecor_cairo_proxy_tag);
 }
 
 static bool
@@ -866,7 +866,7 @@ create_surface_subsurface_pair(struct libdecor_frame_cairo *frame_cairo,
 
 	wl_surface = wl_compositor_create_surface(wl_compositor);
 	wl_proxy_set_tag((struct wl_proxy *) wl_surface,
-			 &libdecoration_cairo_proxy_tag);
+			 &libdecor_cairo_proxy_tag);
 
 	parent = libdecor_frame_get_wl_surface(frame);
 	wl_subsurface = wl_subcompositor_get_subsurface(wl_subcompositor,
@@ -2282,7 +2282,7 @@ init_wl_output(struct libdecor_plugin_cairo *plugin_cairo,
 		wl_registry_bind(plugin_cairo->wl_registry,
 				 id, &wl_output_interface, 2);
 	wl_proxy_set_tag((struct wl_proxy *) output->wl_output,
-			 &libdecoration_cairo_proxy_tag);
+			 &libdecor_cairo_proxy_tag);
 	wl_output_add_listener(output->wl_output, &output_listener, output);
 }
 
@@ -2443,8 +2443,8 @@ libdecor_plugin_new(struct libdecor *context)
 }
 
 LIBDECOR_EXPORT const struct libdecor_plugin_description
-libdecoration_plugin_description = {
+libdecor_plugin_description = {
 	.api_version = LIBDECOR_PLUGIN_API_VERSION,
-	.description = "libdecoration plugin using Cairo",
+	.description = "libdecor plugin using Cairo",
 	.constructor = libdecor_plugin_new,
 };

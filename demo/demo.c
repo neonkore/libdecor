@@ -37,7 +37,7 @@
 #include <unistd.h>
 #include <wayland-cursor.h>
 
-#include "libdecoration.h"
+#include "libdecor.h"
 #include "utils.h"
 #include "cursor-settings.h"
 
@@ -45,7 +45,7 @@ static const size_t chk = 16;
 static const int DEFAULT_WIDTH = 30*chk;
 static const int DEFAULT_HEIGHT = 20*chk;
 
-static const char *proxy_tag = "libdecoration-demo";
+static const char *proxy_tag = "libdecor-demo";
 
 static bool
 own_proxy(struct wl_proxy *proxy)
@@ -800,8 +800,8 @@ main(int argc,
 	context = libdecor_new(wl_display, &libdecor_iface);
 	window->frame = libdecor_decorate(context, window->wl_surface,
 					  &libdecor_frame_iface, window);
-	libdecor_frame_set_app_id(window->frame, "libdecoration-demo");
-	libdecor_frame_set_title(window->frame, "libdecoration demo");
+	libdecor_frame_set_app_id(window->frame, "libdecor-demo");
+	libdecor_frame_set_title(window->frame, "libdecor demo");
 	libdecor_frame_map(window->frame);
 
 	while (wl_display_dispatch(wl_display) != -1);

@@ -33,9 +33,9 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include "libdecoration.h"
-#include "libdecoration-fallback.h"
-#include "libdecoration-plugin.h"
+#include "libdecor.h"
+#include "libdecor-fallback.h"
+#include "libdecor-plugin.h"
 #include "utils.h"
 
 #include "xdg-shell-client-protocol.h"
@@ -1009,7 +1009,7 @@ load_plugin(struct libdecor *context,
 		return NULL;
 	}
 
-	plugin_description = dlsym(lib, "libdecoration_plugin_description");
+	plugin_description = dlsym(lib, "libdecor_plugin_description");
 	if (!plugin_description) {
 		dlclose(lib);
 		fprintf(stderr,

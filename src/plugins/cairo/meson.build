@@ -2,18 +2,18 @@ cairo_dep = dependency('cairo')
 wayland_cursor_dep = dependency('wayland-cursor')
 math_dep = cc.find_library('m', required: true)
 
-shared_module('decoration-cairo',
+shared_module('decor-cairo',
   sources: [
-    'libdecoration-cairo.c',
-    'libdecoration-cairo-blur.c',
+    'libdecor-cairo.c',
+    'libdecor-cairo-blur.c',
   ],
   include_directories: [
     top_includepath,
-    libdecoration_includepath,
+    libdecor_includepath,
   ],
-  c_args: libdecoration_c_args,
+  c_args: libdecor_c_args,
   dependencies: [
-    libdecoration_dep,
+    libdecor_dep,
     cairo_dep,
     math_dep,
     wayland_cursor_dep,

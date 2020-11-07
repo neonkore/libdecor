@@ -24,10 +24,10 @@
  * SOFTWARE.
  */
 
-#ifndef LIBDECORATION_PLUGIN_H
-#define LIBDECORATION_PLUGIN_H
+#ifndef LIBDECOR_PLUGIN_H
+#define LIBDECOR_PLUGIN_H
 
-#include "libdecoration.h"
+#include "libdecor.h"
 
 struct libdecor_frame_private;
 
@@ -97,4 +97,4 @@ libdecor_notify_plugin_error(struct libdecor *context,
 			     enum libdecor_error error,
 			     const char *message);
 
-#endif /* LIBDECORATION_PLUGIN_H */
+#endif /* LIBDECOR_PLUGIN_H */

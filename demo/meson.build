@@ -12,15 +12,15 @@ executable('libdecor-demo',
   ],
   include_directories: [
     top_includepath,
-    libdecoration_includepath,
+    libdecor_includepath,
   ],
-  dependencies: [libdecoration_dep, wayland_cursor_dep, cursor_settings_dep],
+  dependencies: [libdecor_dep, wayland_cursor_dep, cursor_settings_dep],
   install: false,
 )
 
 executable('libdecor-egl',
   sources: 'egl.c',
-  include_directories: libdecoration_includepath,
-  dependencies: [libdecoration_dep, wayland_egl_dep, egl_dep, gl_dep, math_dep],
+  include_directories: libdecor_includepath,
+  dependencies: [libdecor_dep, wayland_egl_dep, egl_dep, gl_dep, math_dep],
   install: false,
 )

@@ -1,25 +1,25 @@
 pkg = import('pkgconfig')
 
-libdecoration_includepath = include_directories('.')
+libdecor_includepath = include_directories('.')
 
-libdecoration_includes = [
-  libdecoration_includepath,
+libdecor_includes = [
+  libdecor_includepath,
   top_includepath,
 ]
 
-libdecoration_sources = [
-  'libdecoration.c',
-  'libdecoration-fallback.c',
+libdecor_sources = [
+  'libdecor.c',
+  'libdecor-fallback.c',
 ]
 
-libdecoration_headers = [
-  'libdecoration.h',
+libdecor_headers = [
+  'libdecor.h',
 ]
-install_headers(libdecoration_headers,
-  subdir: '@0@'.format(libdecoration_full_name),
+install_headers(libdecor_headers,
+  subdir: '@0@'.format(libdecor_full_name),
 )
 
-libdecoration_built_sources = []
+libdecor_built_sources = []
 
 wayland_scanner = find_program('wayland-scanner')
 
@@ -47,7 +47,7 @@ foreach p: wayland_protocols
   output_base = name
   input = join_paths(protocols_dir, stability, name, name+suffix+'.xml')
 
-  libdecoration_built_sources += custom_target('@0@ client header'.format(output_base),
+  libdecor_built_sources += custom_target('@0@ client header'.format(output_base),
     input: input,
     output: '@0@-client-protocol.h'.format(output_base),
     command: [
@@ -56,7 +56,7 @@ foreach p: wayland_protocols
       '@INPUT@', '@OUTPUT@',
     ]
   )
-  libdecoration_built_sources += custom_target('@0@ source'.format(output_base),
+  libdecor_built_sources += custom_target('@0@ source'.format(output_base),
     input: input,
     output: '@0@-protocol.c'.format(output_base),
     command: [
@@ -79,14 +79,14 @@ cursor_settings_dep = declare_dependency(
   dependencies: [dbus_dep],
 )
 
-## core decoration library
-libdecoration = both_libraries(libdecoration_name,
+## core decor library
+libdecor = both_libraries(libdecor_name,
   sources: [
-    libdecoration_sources,
-    libdecoration_built_sources,
+    libdecor_sources,
+    libdecor_built_sources,
   ],
-  include_directories: libdecoration_includes,
-  c_args: libdecoration_c_args,
+  include_directories: libdecor_includes,
+  c_args: libdecor_c_args,
   dependencies: [
     wayland_client_dep,
     dl_dep,
@@ -96,28 +96,28 @@ libdecoration = both_libraries(libdecoration_name,
   install: true
 )
 
-libdecoration_dep = declare_dependency(
-  link_with: libdecoration,
+libdecor_dep = declare_dependency(
+  link_with: libdecor,
   dependencies: [
     wayland_client_dep,
   ],
 )
 
-libdecoration_static_dep = declare_dependency(
-  link_with: libdecoration.get_static_lib(),
+libdecor_static_dep = declare_dependency(
+  link_with: libdecor.get_static_lib(),
   dependencies: [
     wayland_client_dep,
   ],
 )
 
-## decoration plugins
+## decor plugins
 subdir('plugins')
 
 ## pkg-config file
 pkg.generate(
-  name: libdecoration_full_name,
-  description: 'library for Wayland client-side window decorations',
-  libraries: libdecoration,
-  subdirs: libdecoration_full_name,
+  name: libdecor_full_name,
+  description: 'library for Wayland client-side window decors',
+  libraries: libdecor,
+  subdirs: libdecor_full_name,
   version: meson.project_version()
 )
