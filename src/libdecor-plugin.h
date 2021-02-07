@@ -45,9 +45,32 @@ struct libdecor_plugin {
 
 typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *context);
 
+#define LIBDECOR_PLUGIN_PRIORITY_HIGH 1000
+#define LIBDECOR_PLUGIN_PRIORITY_MEDIUM 100
+#define LIBDECOR_PLUGIN_PRIORITY_LOW 0
+
+struct libdecor_plugin_priority {
+	const char *desktop;
+	int priority;
+};
+
 struct libdecor_plugin_description {
+	/* API version the plugin is compatible with. */
 	int api_version;
+
+	/* Human readable string describing the plugin. */
 	char *description;
+
+	/*
+	 * The priorities field points to a list of per desktop priorities.
+	 * properties[i].desktop is matched against XDG_CURRENT_DESKTOP when
+	 * determining what plugin to use. The last entry in the list MUST have
+	 * the priorities[i].desktop pointer set to NULL as a default
+	 * priority.
+	 */
+	const struct libdecor_plugin_priority *priorities;
+
+	/* Vfunc used for constructing a plugin instance. */
 	libdecor_plugin_constructor constructor;
 };
 

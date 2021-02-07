@@ -2442,9 +2442,14 @@ libdecor_plugin_new(struct libdecor *context)
 	return &plugin_cairo->plugin;
 }
 
+static struct libdecor_plugin_priority priorities[] = {
+	{ NULL, LIBDECOR_PLUGIN_PRIORITY_MEDIUM }
+};
+
 LIBDECOR_EXPORT const struct libdecor_plugin_description
 libdecor_plugin_description = {
 	.api_version = LIBDECOR_PLUGIN_API_VERSION,
 	.description = "libdecor plugin using Cairo",
+	.priorities = priorities,
 	.constructor = libdecor_plugin_new,
 };

@@ -989,15 +989,71 @@ static const struct wl_callback_listener init_wl_display_callback_listener = {
 	init_wl_display_callback
 };
 
-static struct libdecor_plugin *
-load_plugin(struct libdecor *context,
-	    const char *path,
-	    const char *name)
+struct plugin_loader {
+	struct wl_list link;
+	void *lib;
+	const struct libdecor_plugin_description *description;
+	int priority;
+	char *name;
+};
+
+static int
+calculate_priority(const struct libdecor_plugin_description *plugin_description)
+{
+	const char *current_desktop;
+	int i;
+
+	if (!plugin_description->priorities)
+		return -1;
+
+	current_desktop = getenv("XDG_CURRENT_DESKTOP");
+
+	i = 0;
+	while (true) {
+		struct libdecor_plugin_priority priority =
+			plugin_description->priorities[i];
+
+		i++;
+
+		if (priority.desktop) {
+			char *tokens;
+			char *saveptr;
+			char *token;
+
+			if (!current_desktop)
+				continue;
+
+			tokens = strdup(current_desktop);
+			token = strtok_r(tokens, ":", &saveptr);
+			while (token) {
+				if (strcmp(priority.desktop, token) == 0) {
+					free(tokens);
+					return priority.priority;
+				}
+				token = strtok_r(NULL, ":", &saveptr);
+			}
+			free(tokens);
+		} else {
+			return priority.priority;
+		}
+	}
+
+	return -1;
+}
+
+static struct plugin_loader *
+load_plugin_loader(struct libdecor *context,
+		   const char *path,
+		   const char *name)
 {
 	char *filename;
 	void *lib;
 	const struct libdecor_plugin_description *plugin_description;
-	struct libdecor_plugin *plugin;
+	int priority;
+	struct plugin_loader *plugin_loader;
+
+	if (!strstr(name, ".so"))
+		return NULL;
 
 	if (asprintf(&filename, "%s/%s", path, name) == -1)
 		return NULL;
@@ -1029,16 +1085,29 @@ load_plugin(struct libdecor *context,
 		return NULL;
 	}
 
-	plugin = plugin_description->constructor(context);
-	if (!plugin) {
+	priority = calculate_priority(plugin_description);
+	if (priority == -1) {
 		dlclose(lib);
 		fprintf(stderr,
-			"Failed to load plugin '%s': failod to init\n",
+			"Plugin '%s' found, but has an invalid description\n",
 			name);
 		return NULL;
 	}
 
-	return plugin;
+	plugin_loader = zalloc(sizeof *plugin_loader);
+	plugin_loader->description = plugin_description;
+	plugin_loader->lib = lib;
+	plugin_loader->priority = priority;
+	plugin_loader->name = strdup(name);
+
+	return plugin_loader;
+}
+
+static bool
+plugin_loader_higher_priority(struct plugin_loader *plugin_loader,
+			      struct plugin_loader *best_plugin_loader)
+{
+	return plugin_loader->priority > best_plugin_loader->priority;
 }
 
 static int
@@ -1046,6 +1115,10 @@ init_plugins(struct libdecor *context)
 {
 	const char *plugin_dir;
 	DIR *dir;
+	struct wl_list plugin_loaders;
+	struct plugin_loader *plugin_loader, *tmp;
+	struct plugin_loader *best_plugin_loader;
+	struct libdecor_plugin *plugin;
 
 	plugin_dir = getenv("LIBDECOR_PLUGIN_DIR");
 	if (!plugin_dir)
@@ -1058,26 +1131,65 @@ init_plugins(struct libdecor *context)
 		return -1;
 	}
 
+	wl_list_init(&plugin_loaders);
+
 	while (true) {
 		struct dirent *de;
-		struct libdecor_plugin *plugin;
+		struct plugin_loader *plugin_loader;
 
 		de = readdir(dir);
 		if (!de)
 			break;
 
-		plugin = load_plugin(context, plugin_dir, de->d_name);
-		if (plugin) {
-			fprintf(stderr, "Loaded plugin '%s'\n", de->d_name);
-			context->plugin = plugin;
-			break;
-		}
+		plugin_loader = load_plugin_loader(context, plugin_dir, de->d_name);
+		if (!plugin_loader)
+			continue;
+
+		wl_list_insert(plugin_loaders.prev, &plugin_loader->link);
 	}
 
 	closedir(dir);
 
-	if (!context->plugin)
+retry_next:
+	best_plugin_loader = NULL;
+	wl_list_for_each(plugin_loader, &plugin_loaders, link) {
+		if (!best_plugin_loader) {
+			best_plugin_loader = plugin_loader;
+			continue;
+		}
+
+		if (plugin_loader_higher_priority(plugin_loader,
+						  best_plugin_loader))
+			best_plugin_loader = plugin_loader;
+	}
+
+	if (!best_plugin_loader)
 		return -1;
+
+	plugin_loader = best_plugin_loader;
+	plugin = plugin_loader->description->constructor(context);
+	if (!plugin) {
+		fprintf(stderr,
+			"Failed to load plugin '%s': failod to init\n",
+			plugin_loader->name);
+		dlclose(plugin_loader->lib);
+		wl_list_remove(&plugin_loader->link);
+		free(plugin_loader->name);
+		free(plugin_loader);
+		goto retry_next;
+	}
+
+	context->plugin = plugin;
+
+	wl_list_remove(&plugin_loader->link);
+	free(plugin_loader->name);
+	free(plugin_loader);
+
+	wl_list_for_each_safe(plugin_loader, tmp, &plugin_loaders, link) {
+		dlclose(plugin_loader->lib);
+		free(plugin_loader->name);
+		free(plugin_loader);
+	}
 
 	return 0;
 }
