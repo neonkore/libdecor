@@ -2227,8 +2227,7 @@ pointer_button(void *data,
 							seat->wl_seat,
 							serial,
 							seat->pointer_x,
-							seat->pointer_y
-							-TITLE_HEIGHT);
+							seat->pointer_y - TITLE_HEIGHT);
 	}
 }
 
