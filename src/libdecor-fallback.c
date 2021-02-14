@@ -126,6 +126,18 @@ libdecor_plugin_fallback_frame_property_changed(struct libdecor_plugin *plugin,
 {
 }
 
+static void
+libdecor_plugin_fallback_frame_translate_coordinate(struct libdecor_plugin *plugin,
+						    struct libdecor_frame *frame,
+						    int content_x,
+						    int content_y,
+						    int *frame_x,
+						    int *frame_y)
+{
+	*frame_x = content_x;
+	*frame_y = content_y;
+}
+
 static bool
 libdecor_plugin_fallback_configuration_get_content_size(struct libdecor_plugin *plugin,
 							struct libdecor_configuration *configuration,
@@ -146,6 +158,8 @@ static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.frame_free = libdecor_plugin_fallback_frame_free,
 	.frame_commit = libdecor_plugin_fallback_frame_commit,
 	.frame_property_changed = libdecor_plugin_fallback_frame_property_changed,
+	.frame_translate_coordinate =
+		libdecor_plugin_fallback_frame_translate_coordinate,
 	.configuration_get_content_size = libdecor_plugin_fallback_configuration_get_content_size,
 };
 

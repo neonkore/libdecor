@@ -159,6 +159,13 @@ libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 				int y);
 
 void
+libdecor_frame_translate_coordinate(struct libdecor_frame *frame,
+				    int surface_x,
+				    int surface_y,
+				    int *frame_x,
+				    int *frame_y);
+
+void
 libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 				    int content_width,
 				    int content_height);

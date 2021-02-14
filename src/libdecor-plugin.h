@@ -90,6 +90,12 @@ struct libdecor_plugin_interface {
 			      struct libdecor_configuration *configuration);
 	void (*frame_property_changed)(struct libdecor_plugin *plugin,
 				       struct libdecor_frame *frame);
+	void (* frame_translate_coordinate)(struct libdecor_plugin *plugin,
+					    struct libdecor_frame *frame,
+					    int content_x,
+					    int content_y,
+					    int *window_x,
+					    int *window_y);
 
 	bool (* configuration_get_content_size)(struct libdecor_plugin *plugin,
 						struct libdecor_configuration *configuration,

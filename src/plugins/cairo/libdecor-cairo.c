@@ -1665,7 +1665,6 @@ libdecor_plugin_cairo_frame_property_changed(struct libdecor_plugin *plugin,
 {
 	struct libdecor_frame_cairo *frame_cairo =
 		(struct libdecor_frame_cairo *) frame;
-
 	bool redraw_needed = false;
 	const char *new_title;
 
@@ -1689,6 +1688,24 @@ libdecor_plugin_cairo_frame_property_changed(struct libdecor_plugin *plugin,
 		draw_decoration(frame_cairo);
 		libdecor_frame_toplevel_commit(frame);
 	}
+}
+
+static void
+libdecor_plugin_cairo_frame_translate_coordinate(struct libdecor_plugin *plugin,
+						 struct libdecor_frame *frame,
+						 int content_x,
+						 int content_y,
+						 int *frame_x,
+						 int *frame_y)
+{
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+
+	*frame_x = content_x;
+	*frame_y = content_y;
+
+	if (frame_cairo->title_bar.is_showing)
+		*frame_y += TITLE_HEIGHT;
 }
 
 static bool
@@ -1747,6 +1764,8 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.frame_free = libdecor_plugin_cairo_frame_free,
 	.frame_commit = libdecor_plugin_cairo_frame_commit,
 	.frame_property_changed = libdecor_plugin_cairo_frame_property_changed,
+	.frame_translate_coordinate =
+		libdecor_plugin_cairo_frame_translate_coordinate,
 
 	.configuration_get_content_size =
 			libdecor_plugin_cairo_configuration_get_content_size,

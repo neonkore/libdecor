@@ -631,6 +631,22 @@ libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
+libdecor_frame_translate_coordinate(struct libdecor_frame *frame,
+				    int content_x,
+				    int content_y,
+				    int *frame_x,
+				    int *frame_y)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	plugin->iface->frame_translate_coordinate(plugin, frame,
+						  content_x, content_y,
+						  frame_x, frame_y);
+}
+
+LIBDECOR_EXPORT void
 libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 				    int content_width,
 				    int content_height)
