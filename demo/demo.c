@@ -41,9 +41,14 @@
 #include "utils.h"
 #include "cursor-settings.h"
 
+#include "xdg-shell-client-protocol.h"
+
 static const size_t chk = 16;
 static const int DEFAULT_WIDTH = 30*chk;
 static const int DEFAULT_HEIGHT = 20*chk;
+
+static const int POPUP_WIDTH = 100;
+static const int POPUP_HEIGHT = 300;
 
 static const char *proxy_tag = "libdecor-demo";
 
@@ -65,6 +70,13 @@ struct buffer {
 	size_t data_size;
 };
 
+struct popup {
+	struct wl_surface *wl_surface;
+	struct xdg_surface *xdg_surface;
+	struct xdg_popup *xdg_popup;
+	struct xdg_surface *parent;
+};
+
 struct window {
 	struct wl_surface *wl_surface;
 	struct buffer *buffer;
@@ -76,6 +88,7 @@ struct window {
 	enum libdecor_window_state window_state;
 	struct wl_list outputs;
 	int scale;
+	struct popup *popup;
 };
 
 struct seat {
@@ -112,6 +125,7 @@ struct pointer_output {
 
 static struct wl_compositor *wl_compositor;
 static struct wl_shm *wl_shm;
+static struct xdg_wm_base *xdg_wm_base;
 static struct wl_list seats;
 static struct wl_list outputs;
 
@@ -121,6 +135,11 @@ static struct window *window;
 
 static void
 redraw(struct window *window);
+
+static struct buffer *
+create_shm_buffer(int width,
+		  int height,
+		  uint32_t format);
 
 static void
 update_scale(struct window *window)
@@ -311,6 +330,127 @@ pointer_motion(void *data,
 	seat->pointer_sy = surface_y;
 }
 
+static struct xdg_positioner *
+create_positioner(struct seat *seat)
+{
+	struct xdg_positioner *positioner;
+	enum xdg_positioner_constraint_adjustment constraint_adjustment;
+	int x, y;
+
+	positioner = xdg_wm_base_create_positioner(xdg_wm_base);
+	xdg_positioner_set_size(positioner, POPUP_WIDTH, POPUP_HEIGHT);
+
+	libdecor_frame_translate_coordinate(window->frame,
+					    wl_fixed_to_int(seat->pointer_sx),
+					    wl_fixed_to_int(seat->pointer_sy),
+					    &x, &y);
+
+	xdg_positioner_set_anchor_rect(positioner, x, y, 1, 1);
+
+	constraint_adjustment = (XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_FLIP_Y |
+				 XDG_POSITIONER_CONSTRAINT_ADJUSTMENT_SLIDE_X);
+	xdg_positioner_set_constraint_adjustment (positioner,
+						  constraint_adjustment);
+
+	xdg_positioner_set_anchor (positioner,
+				   XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT);
+	xdg_positioner_set_gravity (positioner,
+				    XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT);
+
+	return positioner;
+}
+
+static void
+xdg_popup_configure(void *data,
+		    struct xdg_popup *xdg_popup,
+		    int32_t x,
+		    int32_t y,
+		    int32_t width,
+		    int32_t height)
+{
+}
+
+static void
+xdg_popup_done(void             *data,
+	       struct xdg_popup *xdg_popup)
+{
+	struct popup *popup = data;
+
+	xdg_popup_destroy(popup->xdg_popup);
+	xdg_surface_destroy(popup->xdg_surface);
+	wl_surface_destroy(popup->wl_surface);
+	free(popup);
+	window->popup = NULL;
+}
+
+static const struct xdg_popup_listener xdg_popup_listener = {
+	xdg_popup_configure,
+	xdg_popup_done,
+};
+
+static void
+xdg_surface_configure(void *data,
+		      struct xdg_surface *xdg_surface,
+		      uint32_t serial)
+{
+	struct popup *popup = data;
+	uint32_t *pixels;
+	struct buffer *buffer;
+	int y;
+
+	buffer = create_shm_buffer(POPUP_WIDTH, POPUP_HEIGHT,
+				   WL_SHM_FORMAT_XRGB8888);
+	pixels = buffer->data;
+	for (y = 0; y < POPUP_HEIGHT; y++) {
+		int x;
+
+		for (x = 0; x < POPUP_WIDTH; x++)
+			pixels[y * POPUP_WIDTH + x] = 0xff4455ff;
+	}
+
+	wl_surface_attach(popup->wl_surface, buffer->wl_buffer, 0, 0);
+	wl_surface_set_buffer_scale(window->wl_surface, window->scale);
+	wl_surface_damage(window->wl_surface, 0, 0,
+			  POPUP_WIDTH, POPUP_HEIGHT);
+	xdg_surface_ack_configure(popup->xdg_surface, serial);
+	wl_surface_commit(popup->wl_surface);
+}
+
+static const struct xdg_surface_listener xdg_surface_listener = {
+	xdg_surface_configure,
+};
+
+static void
+open_popup(struct seat *seat)
+{
+	struct popup *popup;
+	struct xdg_positioner *positioner;
+
+	popup = zalloc(sizeof *popup);
+
+	popup->wl_surface = wl_compositor_create_surface(wl_compositor);
+	popup->xdg_surface = xdg_wm_base_get_xdg_surface (xdg_wm_base,
+							  popup->wl_surface);
+	popup->parent = libdecor_frame_get_xdg_surface(window->frame);
+	positioner = create_positioner(seat);
+	popup->xdg_popup = xdg_surface_get_popup(popup->xdg_surface,
+						 popup->parent,
+						 positioner);
+	xdg_positioner_destroy(positioner);
+
+	xdg_surface_add_listener (popup->xdg_surface,
+				  &xdg_surface_listener,
+				  popup);
+	xdg_popup_add_listener (popup->xdg_popup,
+				&xdg_popup_listener,
+				popup);
+
+	window->popup = popup;
+
+	xdg_popup_grab(popup->xdg_popup, seat->wl_seat, seat->serial);
+	wl_surface_commit(popup->wl_surface);
+}
+
 static void
 pointer_button(void *data,
 	       struct wl_pointer *wl_pointer,
@@ -336,6 +476,10 @@ pointer_button(void *data,
 						serial,
 						wl_fixed_to_int(seat->pointer_sx),
 						wl_fixed_to_int(seat->pointer_sy));
+	} else if (button == BTN_RIGHT &&
+		   state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		if (!window->popup)
+			open_popup(seat);
 	}
 }
 
@@ -447,6 +591,18 @@ static struct wl_output_listener output_listener = {
 };
 
 static void
+xdg_wm_base_ping(void *user_data,
+		 struct xdg_wm_base *xdg_wm_base,
+		 uint32_t serial)
+{
+	xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+	xdg_wm_base_ping,
+};
+
+static void
 registry_handle_global(void *user_data,
 		       struct wl_registry *wl_registry,
 		       uint32_t id,
@@ -496,6 +652,13 @@ registry_handle_global(void *user_data,
 		wl_output_add_listener(output->wl_output, &output_listener,
 				       output);
 		wl_list_insert(&outputs, &output->link);
+	} else if (strcmp(interface, "xdg_wm_base") == 0) {
+		xdg_wm_base = wl_registry_bind(wl_registry, id,
+					       &xdg_wm_base_interface,
+					       1);
+		xdg_wm_base_add_listener(xdg_wm_base,
+					 &xdg_wm_base_listener,
+					 NULL);
 	}
 }
 

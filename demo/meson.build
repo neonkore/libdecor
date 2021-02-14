@@ -6,9 +6,33 @@ egl_dep = dependency('egl')
 gl_dep = dependency('gl')
 wayland_egl_dep = dependency('wayland-egl')
 
+xdg_shell_path = join_paths(protocols_dir, 'stable', 'xdg-shell', 'xdg-shell.xml')
+
+xdg_shell_client_header = custom_target('xdg-shell client header (demo)',
+  input: xdg_shell_path,
+  output: 'xdg-shell-client-protocol.h',
+  command: [
+    wayland_scanner,
+    'client-header',
+    '@INPUT@', '@OUTPUT@',
+  ]
+)
+
+xdg_shell_source = custom_target('xdg-shell source (demo)',
+  input: xdg_shell_path,
+  output: 'xdg-shell-protocol.c',
+  command: [
+    wayland_scanner,
+    'private-code',
+    '@INPUT@', '@OUTPUT@',
+  ]
+)
+
 executable('libdecor-demo',
   sources: [
     'demo.c',
+    xdg_shell_client_header,
+    xdg_shell_source,
   ],
   include_directories: [
     top_includepath,
