@@ -89,6 +89,8 @@ struct seat {
 	struct wl_surface *pointer_focus;
 	int pointer_scale;
 	uint32_t serial;
+	wl_fixed_t pointer_sx;
+	wl_fixed_t pointer_sy;
 };
 
 struct output {
@@ -280,6 +282,9 @@ pointer_enter(void *data,
 		return;
 
 	set_cursor(seat);
+
+	seat->pointer_sx = surface_x;
+	seat->pointer_sy = surface_y;
 }
 
 static void
@@ -300,6 +305,10 @@ pointer_motion(void *data,
 	       wl_fixed_t surface_x,
 	       wl_fixed_t surface_y)
 {
+	struct seat *seat = data;
+
+	seat->pointer_sx = surface_x;
+	seat->pointer_sy = surface_y;
 }
 
 static void
@@ -311,10 +320,22 @@ pointer_button(void *data,
 	       uint32_t state)
 {
 	struct seat *seat = data;
+
+	if (seat->pointer_focus != window->wl_surface)
+		return;
+
+	seat->serial = serial;
+
 	if (button == BTN_LEFT &&
-	    state == WL_POINTER_BUTTON_STATE_PRESSED &&
-	    seat->pointer_focus == window->wl_surface) {
+	    state == WL_POINTER_BUTTON_STATE_PRESSED) {
 		libdecor_frame_move(window->frame, seat->wl_seat, serial);
+	} else if (button == BTN_MIDDLE &&
+	    state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		libdecor_frame_show_window_menu(window->frame,
+						seat->wl_seat,
+						serial,
+						wl_fixed_to_int(seat->pointer_sx),
+						wl_fixed_to_int(seat->pointer_sy));
 	}
 }
 
