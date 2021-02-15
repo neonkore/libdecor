@@ -119,6 +119,13 @@ struct libdecor_frame_private {
 	enum libdecor_capabilities capabilities;
 };
 
+static bool
+streql(const char *str1, const char *str2)
+{
+	return (str1 && str2) && (strcmp(str1, str2) == 0);
+}
+
+
 static void
 do_map(struct libdecor_frame *frame);
 
@@ -533,14 +540,19 @@ libdecor_frame_set_title(struct libdecor_frame *frame,
 			 const char *title)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor_plugin *plugin = frame_priv->context->plugin;
 
-	free(frame_priv->state.title);
-	frame_priv->state.title = strdup(title);
+	if (!streql(frame_priv->state.title, title)) {
+		free(frame_priv->state.title);
+		frame_priv->state.title = strdup(title);
 
-	if (!frame_priv->xdg_toplevel)
-		return;
+		if (!frame_priv->xdg_toplevel)
+			return;
 
-	xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
+		xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
+	
+		plugin->iface->frame_property_changed(plugin, frame);
+	}
 }
 
 LIBDECOR_EXPORT const char *
@@ -568,14 +580,28 @@ LIBDECOR_EXPORT void
 libdecor_frame_set_capabilities(struct libdecor_frame *frame,
 				enum libdecor_capabilities capabilities)
 {
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+	const enum libdecor_capabilities old_capabilities =
+			frame->priv->capabilities;
+
 	frame->priv->capabilities |= capabilities;
+
+	if (frame->priv->capabilities != old_capabilities)
+		plugin->iface->frame_property_changed(plugin, frame);
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_unset_capabilities(struct libdecor_frame *frame,
 				  enum libdecor_capabilities capabilities)
 {
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+	const enum libdecor_capabilities old_capabilities =
+			frame->priv->capabilities;
+
 	frame->priv->capabilities &= ~capabilities;
+
+	if (frame->priv->capabilities != old_capabilities)
+		plugin->iface->frame_property_changed(plugin, frame);
 }
 
 LIBDECOR_EXPORT bool

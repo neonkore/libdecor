@@ -120,6 +120,12 @@ libdecor_plugin_fallback_frame_commit(struct libdecor_plugin *plugin,
 {
 }
 
+static void
+libdecor_plugin_fallback_frame_property_changed(struct libdecor_plugin *plugin,
+						struct libdecor_frame *frame)
+{
+}
+
 static bool
 libdecor_plugin_fallback_configuration_get_content_size(struct libdecor_plugin *plugin,
 							struct libdecor_configuration *configuration,
@@ -139,6 +145,7 @@ static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.frame_new = libdecor_plugin_fallback_frame_new,
 	.frame_free = libdecor_plugin_fallback_frame_free,
 	.frame_commit = libdecor_plugin_fallback_frame_commit,
+	.frame_property_changed = libdecor_plugin_fallback_frame_property_changed,
 	.configuration_get_content_size = libdecor_plugin_fallback_configuration_get_content_size,
 };
 
