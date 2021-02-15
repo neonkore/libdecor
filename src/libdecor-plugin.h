@@ -113,6 +113,9 @@ libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
 				   int32_t x, int32_t y,
 				   int32_t width, int32_t height);
 
+enum libdecor_capabilities
+libdecor_frame_get_capabilities(const struct libdecor_frame *frame);
+
 struct wl_display *
 libdecor_get_wl_display(struct libdecor *context);
 

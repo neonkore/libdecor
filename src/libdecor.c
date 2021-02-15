@@ -634,6 +634,12 @@ libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
 	xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
 }
 
+LIBDECOR_EXPORT enum libdecor_capabilities
+libdecor_frame_get_capabilities(const struct libdecor_frame *frame)
+{
+	return frame->priv->capabilities;
+}
+
 enum xdg_toplevel_resize_edge
 edge_to_xdg_edge(enum libdecor_resize_edge edge)
 {
