@@ -1050,6 +1050,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 					  CAIRO_FORMAT_ARGB32,
 					  buffer->buffer_width)
 				  );
+		cairo_surface_set_device_scale(surface, scale, scale);
 		width = buffer->width;
 		height = buffer->height;
 		break;
@@ -1061,7 +1062,6 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	}
 
 	cr = cairo_create(surface);
-	cairo_scale(cr, scale, scale);
 	cairo_save(cr);
 	cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.0);
 	cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
@@ -1321,6 +1321,7 @@ ensure_component_realized_client(struct libdecor_frame_cairo *frame_cairo,
 			cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
 						   component_width * scale,
 						   component_height * scale);
+		cairo_surface_set_device_scale(new_image, scale, scale);
 		border_component->client.image = new_image;
 	}
 
