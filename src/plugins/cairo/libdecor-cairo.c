@@ -97,6 +97,12 @@ cairo_set_rgba32(cairo_t *cr, const uint32_t *const c) {
 	cairo_set_source_rgba(cr, red(c), green(c), blue(c), alpha(c));
 }
 
+static bool
+streql(const char *str1, const char *str2)
+{
+	return (str1 && str2) && (strcmp(str1, str2) == 0);
+}
+
 enum decoration_type {
 	DECORATION_TYPE_NONE,
 	DECORATION_TYPE_ALL,
@@ -210,6 +216,10 @@ struct libdecor_frame_cairo {
 	int content_height;
 
 	enum decoration_type decoration_type;
+
+	char *title;
+
+	enum libdecor_capabilities capabilities;
 
 	struct border_component *active;
 
@@ -1649,6 +1659,38 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 	}
 }
 
+static void
+libdecor_plugin_cairo_frame_property_changed(struct libdecor_plugin *plugin,
+					     struct libdecor_frame *frame)
+{
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+
+	bool redraw_needed = false;
+	const char *new_title;
+
+	new_title = libdecor_frame_get_title(frame);
+	if (frame_cairo->title_bar.is_showing) {
+		if (!streql(frame_cairo->title, new_title))
+			redraw_needed = true;
+	}
+	free(frame_cairo->title);
+	if (new_title)
+		frame_cairo->title = strdup(new_title);
+	else
+		frame_cairo->title = NULL;
+
+	if (frame_cairo->capabilities != libdecor_frame_get_capabilities(frame)) {
+		frame_cairo->capabilities = libdecor_frame_get_capabilities(frame);
+		redraw_needed = true;
+	}
+
+	if (redraw_needed) {
+		draw_decoration(frame_cairo);
+		libdecor_frame_toplevel_commit(frame);
+	}
+}
+
 static bool
 libdecor_plugin_cairo_configuration_get_content_size(
 		struct libdecor_plugin *plugin,
@@ -1704,6 +1746,7 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.frame_new = libdecor_plugin_cairo_frame_new,
 	.frame_free = libdecor_plugin_cairo_frame_free,
 	.frame_commit = libdecor_plugin_cairo_frame_commit,
+	.frame_property_changed = libdecor_plugin_cairo_frame_property_changed,
 
 	.configuration_get_content_size =
 			libdecor_plugin_cairo_configuration_get_content_size,
