@@ -221,7 +221,9 @@ struct libdecor_frame_cairo {
 
 	enum libdecor_capabilities capabilities;
 
+	struct border_component *focus;
 	struct border_component *active;
+	struct border_component *grab;
 
 	bool shadow_showing;
 	struct border_component shadow;
@@ -806,7 +808,12 @@ update_component_focus(struct libdecor_frame_cairo *frame_cairo,
 		}
 	}
 
-	frame_cairo->active = focus_component;
+	if (frame_cairo->grab)
+		frame_cairo->active = frame_cairo->grab;
+	else
+		frame_cairo->active = focus_component;
+	frame_cairo->focus = focus_component;
+
 }
 
 static void
@@ -2107,6 +2114,7 @@ pointer_enter(void *data,
 		return;
 
 	update_component_focus(frame_cairo, seat->pointer_focus, seat);
+	frame_cairo->grab = NULL;
 
 	/* update decorations */
 	if (frame_cairo->active) {
@@ -2183,10 +2191,16 @@ pointer_button(void *data,
 	if (!frame_cairo)
 		return;
 
+	if (!frame_cairo->active)
+		return;
+
 	if (button == BTN_LEFT) {
 		if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
 			enum libdecor_resize_edge edge =
 					LIBDECOR_RESIZE_EDGE_NONE;
+
+			frame_cairo->grab = NULL;
+
 			switch (frame_cairo->active->type) {
 			case SHADOW:
 				edge = component_edge(frame_cairo->active,
@@ -2206,6 +2220,11 @@ pointer_button(void *data,
 							    serial);
 				}
 				break;
+			case BUTTON_MIN:
+			case BUTTON_MAX:
+			case BUTTON_CLOSE:
+				frame_cairo->grab = frame_cairo->active;
+				break;
 			default:
 				break;
 			}
@@ -2219,23 +2238,28 @@ pointer_button(void *data,
 					edge);
 			}
 		}
-		else if (state == WL_POINTER_BUTTON_STATE_RELEASED) {
-			switch (frame_cairo->active->type) {
-			case BUTTON_MIN:
-				if (minimizable(frame_cairo))
-					libdecor_frame_set_minimized(
+		else if (state == WL_POINTER_BUTTON_STATE_RELEASED &&
+			 frame_cairo->grab) {
+			if (frame_cairo->grab == frame_cairo->focus) {
+				switch (frame_cairo->active->type) {
+				case BUTTON_MIN:
+					if (minimizable(frame_cairo))
+						libdecor_frame_set_minimized(
 							&frame_cairo->frame);
-				break;
-			case BUTTON_MAX:
-				toggle_maximized(&frame_cairo->frame);
-				break;
-			case BUTTON_CLOSE:
-				if (closeable(frame_cairo))
-					libdecor_frame_close(&frame_cairo->frame);
-				break;
-			default:
-				break;
+					break;
+				case BUTTON_MAX:
+					toggle_maximized(&frame_cairo->frame);
+					break;
+				case BUTTON_CLOSE:
+					if (closeable(frame_cairo))
+						libdecor_frame_close(&frame_cairo->frame);
+					break;
+				default:
+					break;
+				}
 			}
+			frame_cairo->grab = NULL;
+			sync_active_component(frame_cairo, seat);
 		}
 	}
 	else if (button == BTN_RIGHT &&
