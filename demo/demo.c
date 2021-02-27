@@ -43,6 +43,8 @@
 
 #include "xdg-shell-client-protocol.h"
 
+struct window;
+
 static const size_t chk = 16;
 static const int DEFAULT_WIDTH = 30*chk;
 static const int DEFAULT_HEIGHT = 20*chk;
@@ -75,6 +77,8 @@ struct popup {
 	struct xdg_surface *xdg_surface;
 	struct xdg_popup *xdg_popup;
 	struct xdg_surface *parent;
+	struct seat *seat;
+	struct window *window;
 };
 
 struct window {
@@ -104,6 +108,7 @@ struct seat {
 	uint32_t serial;
 	wl_fixed_t pointer_sx;
 	wl_fixed_t pointer_sy;
+	char *name;
 };
 
 struct output {
@@ -371,16 +376,24 @@ xdg_popup_configure(void *data,
 }
 
 static void
+popup_destroy(struct popup *popup)
+{
+	libdecor_frame_popup_ungrab(popup->window->frame,
+				    popup->seat->name);
+	xdg_popup_destroy(popup->xdg_popup);
+	xdg_surface_destroy(popup->xdg_surface);
+	wl_surface_destroy(popup->wl_surface);
+	popup->window->popup = NULL;
+	free(popup);
+}
+
+static void
 xdg_popup_done(void             *data,
 	       struct xdg_popup *xdg_popup)
 {
 	struct popup *popup = data;
 
-	xdg_popup_destroy(popup->xdg_popup);
-	xdg_surface_destroy(popup->xdg_surface);
-	wl_surface_destroy(popup->wl_surface);
-	free(popup);
-	window->popup = NULL;
+	popup_destroy(popup);
 }
 
 static const struct xdg_popup_listener xdg_popup_listener = {
@@ -432,6 +445,8 @@ open_popup(struct seat *seat)
 	popup->xdg_surface = xdg_wm_base_get_xdg_surface (xdg_wm_base,
 							  popup->wl_surface);
 	popup->parent = libdecor_frame_get_xdg_surface(window->frame);
+	popup->window = window;
+	popup->seat = seat;
 	positioner = create_positioner(seat);
 	popup->xdg_popup = xdg_surface_get_popup(popup->xdg_surface,
 						 popup->parent,
@@ -449,6 +464,16 @@ open_popup(struct seat *seat)
 
 	xdg_popup_grab(popup->xdg_popup, seat->wl_seat, seat->serial);
 	wl_surface_commit(popup->wl_surface);
+
+	libdecor_frame_popup_grab(window->frame, seat->name);
+}
+
+static void
+close_popup(struct window *window)
+{
+	struct popup *popup = window->popup;
+
+	popup_destroy(popup);
 }
 
 static void
@@ -465,6 +490,10 @@ pointer_button(void *data,
 		return;
 
 	seat->serial = serial;
+
+	if (window->popup &&
+	    state == WL_POINTER_BUTTON_STATE_PRESSED)
+		close_popup(window);
 
 	if (button == BTN_LEFT &&
 	    state == WL_POINTER_BUTTON_STATE_PRESSED) {
@@ -525,6 +554,9 @@ seat_name(void *data,
 	  struct wl_seat *wl_seat,
 	  const char *name)
 {
+	struct seat *seat = data;
+
+	seat->name = strdup(name);
 }
 
 static struct wl_seat_listener seat_listener = {
@@ -892,10 +924,19 @@ handle_commit(struct libdecor_frame *frame,
 	wl_surface_commit(window->wl_surface);
 }
 
+static void
+handle_dismiss_popup(struct libdecor_frame *frame,
+		     const char *seat_name,
+		     void *user_data)
+{
+	popup_destroy(window->popup);
+}
+
 static struct libdecor_frame_interface libdecor_frame_iface = {
 	handle_configure,
 	handle_close,
 	handle_commit,
+	handle_dismiss_popup,
 };
 
 static void
