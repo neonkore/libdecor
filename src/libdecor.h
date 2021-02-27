@@ -107,7 +107,8 @@ struct libdecor_frame_interface {
 			   void *user_data);
 	void (* close)(struct libdecor_frame *frame,
 		       void *user_data);
-	void (* commit)(void *user_data);
+	void (* commit)(struct libdecor_frame *frame,
+			void *user_data);
 
 	/* Reserved */
 	void (* reserved0)(void);

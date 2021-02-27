@@ -96,7 +96,8 @@ frame_close(struct libdecor_frame *frame,
 }
 
 static void
-frame_commit(void *user_data)
+frame_commit(struct libdecor_frame *frame,
+	     void *user_data)
 {
 	struct window *window = user_data;
 

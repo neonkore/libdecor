@@ -886,7 +886,8 @@ handle_close(struct libdecor_frame *frame,
 }
 
 static void
-handle_commit(void *user_data)
+handle_commit(struct libdecor_frame *frame,
+	      void *user_data)
 {
 	wl_surface_commit(window->wl_surface);
 }
