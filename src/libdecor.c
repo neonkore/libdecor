@@ -830,7 +830,8 @@ LIBDECOR_EXPORT void
 libdecor_frame_toplevel_commit(struct libdecor_frame *frame)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
-	frame_priv->iface->commit(frame_priv->user_data);
+
+	frame_priv->iface->commit(frame, frame_priv->user_data);
 }
 
 LIBDECOR_EXPORT void
