@@ -138,6 +138,20 @@ libdecor_plugin_fallback_frame_translate_coordinate(struct libdecor_plugin *plug
 	*frame_y = content_y;
 }
 
+static void
+libdecor_plugin_fallback_frame_popup_grab(struct libdecor_plugin *plugin,
+					  struct libdecor_frame *frame,
+					  const char *seat_name)
+{
+}
+
+static void
+libdecor_plugin_fallback_frame_popup_ungrab(struct libdecor_plugin *plugin,
+					    struct libdecor_frame *frame,
+					    const char *seat_name)
+{
+}
+
 static bool
 libdecor_plugin_fallback_configuration_get_content_size(struct libdecor_plugin *plugin,
 							struct libdecor_configuration *configuration,
@@ -160,6 +174,8 @@ static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.frame_property_changed = libdecor_plugin_fallback_frame_property_changed,
 	.frame_translate_coordinate =
 		libdecor_plugin_fallback_frame_translate_coordinate,
+	.frame_popup_grab = libdecor_plugin_fallback_frame_popup_grab,
+	.frame_popup_ungrab = libdecor_plugin_fallback_frame_popup_ungrab,
 	.configuration_get_content_size = libdecor_plugin_fallback_configuration_get_content_size,
 };
 

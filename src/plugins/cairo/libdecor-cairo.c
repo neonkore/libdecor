@@ -126,6 +126,8 @@ enum composite_mode {
 struct seat {
 	struct libdecor_plugin_cairo *plugin_cairo;
 
+	char *name;
+
 	struct wl_seat *wl_seat;
 	struct wl_pointer *wl_pointer;
 
@@ -146,6 +148,8 @@ struct seat {
 	uint32_t pointer_button_time_stamp;
 
 	uint32_t serial;
+
+	bool grabbed;
 
 	struct wl_list link;
 };
@@ -365,6 +369,7 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 			wl_list_remove(&cursor_output->link);
 			free(cursor_output);
 		}
+		free(seat->name);
 
 		free(seat);
 	}
@@ -1731,6 +1736,72 @@ libdecor_plugin_cairo_frame_translate_coordinate(struct libdecor_plugin *plugin,
 }
 
 static bool
+streq(const char *str1,
+      const char *str2)
+{
+	if (!str1 && !str2)
+		return true;
+
+	if (str1 && str2)
+		return strcmp(str1, str2) == 0;
+
+	return false;
+}
+
+static void
+libdecor_plugin_cairo_frame_popup_grab(struct libdecor_plugin *plugin,
+				       struct libdecor_frame *frame,
+				       const char *seat_name)
+{
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+	struct libdecor_plugin_cairo *plugin_cairo = frame_cairo->plugin_cairo;
+	struct seat *seat;
+
+	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+		if (streq(seat->name, seat_name)) {
+			if (seat->grabbed) {
+				fprintf(stderr, "libdecor-WARNING: Application "
+					"tried to grab seat twice\n");
+			}
+			synthesize_pointer_leave(seat);
+			seat->grabbed = true;
+			return;
+		}
+	}
+
+	fprintf(stderr,
+		"libdecor-WARNING: Application tried to grab unknown seat\n");
+}
+
+static void
+libdecor_plugin_cairo_frame_popup_ungrab(struct libdecor_plugin *plugin,
+					 struct libdecor_frame *frame,
+					 const char *seat_name)
+{
+	struct libdecor_frame_cairo *frame_cairo =
+		(struct libdecor_frame_cairo *) frame;
+	struct libdecor_plugin_cairo *plugin_cairo = frame_cairo->plugin_cairo;
+	struct seat *seat;
+
+	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+		if (streq(seat->name, seat_name)) {
+			if (!seat->grabbed) {
+				fprintf(stderr, "libdecor-WARNING: Application "
+					"tried to ungrab seat twice\n");
+			}
+			seat->grabbed = false;
+			synthesize_pointer_enter(seat);
+			sync_active_component(frame_cairo, seat);
+			return;
+		}
+	}
+
+	fprintf(stderr,
+		"libdecor-WARNING: Application tried to ungrab unknown seat\n");
+}
+
+static bool
 libdecor_plugin_cairo_configuration_get_content_size(
 		struct libdecor_plugin *plugin,
 		struct libdecor_configuration *configuration,
@@ -1788,6 +1859,8 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.frame_property_changed = libdecor_plugin_cairo_frame_property_changed,
 	.frame_translate_coordinate =
 		libdecor_plugin_cairo_frame_translate_coordinate,
+	.frame_popup_grab = libdecor_plugin_cairo_frame_popup_grab,
+	.frame_popup_ungrab = libdecor_plugin_cairo_frame_popup_ungrab,
 
 	.configuration_get_content_size =
 			libdecor_plugin_cairo_configuration_get_content_size,
@@ -2163,6 +2236,9 @@ pointer_enter(void *data,
 	seat->serial = serial;
 	seat->pointer_focus = surface;
 
+	if (seat->grabbed)
+		return;
+
 	synthesize_pointer_enter(seat);
 }
 
@@ -2197,6 +2273,9 @@ pointer_motion(void *data,
 	seat->pointer_x = wl_fixed_to_int(surface_x);
 	seat->pointer_y = wl_fixed_to_int(surface_y);
 
+	if (seat->grabbed)
+		return;
+
 	if (!seat->pointer_focus)
 		return;
 
@@ -2222,6 +2301,11 @@ pointer_button(void *data,
 	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
 	if (!frame_cairo)
 		return;
+
+	if (seat->grabbed) {
+		libdecor_frame_dismiss_popup(&frame_cairo->frame, seat->name);
+		return;
+	}
 
 	if (!frame_cairo->active)
 		return;
@@ -2346,6 +2430,9 @@ seat_name(void *data,
 	  struct wl_seat *wl_seat,
 	  const char *name)
 {
+	struct seat *seat = data;
+
+	seat->name = strdup(name);
 }
 
 static struct wl_seat_listener seat_listener = {

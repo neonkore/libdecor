@@ -109,6 +109,9 @@ struct libdecor_frame_interface {
 		       void *user_data);
 	void (* commit)(struct libdecor_frame *frame,
 			void *user_data);
+	void (* dismiss_popup)(struct libdecor_frame *frame,
+			       const char *seat_name,
+			       void *user_data);
 
 	/* Reserved */
 	void (* reserved0)(void);
@@ -182,6 +185,14 @@ libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 				uint32_t serial,
 				int x,
 				int y);
+
+void
+libdecor_frame_popup_grab(struct libdecor_frame *frame,
+			  const char *seat_name);
+
+void
+libdecor_frame_popup_ungrab(struct libdecor_frame *frame,
+			    const char *seat_name);
 
 void
 libdecor_frame_translate_coordinate(struct libdecor_frame *frame,

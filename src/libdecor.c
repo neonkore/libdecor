@@ -612,6 +612,37 @@ libdecor_frame_has_capability(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
+libdecor_frame_popup_grab(struct libdecor_frame *frame,
+			  const char *seat_name)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	plugin->iface->frame_popup_grab(plugin, frame, seat_name);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_popup_ungrab(struct libdecor_frame *frame,
+			    const char *seat_name)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	plugin->iface->frame_popup_ungrab(plugin, frame, seat_name);
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_dismiss_popup(struct libdecor_frame *frame,
+			     const char *seat_name)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->iface->dismiss_popup(frame, seat_name, frame_priv->user_data);
+}
+
+LIBDECOR_EXPORT void
 libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 				struct wl_seat *wl_seat,
 				uint32_t serial,

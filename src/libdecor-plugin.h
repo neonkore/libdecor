@@ -96,6 +96,12 @@ struct libdecor_plugin_interface {
 					    int content_y,
 					    int *window_x,
 					    int *window_y);
+	void (* frame_popup_grab)(struct libdecor_plugin *plugin,
+				  struct libdecor_frame *frame,
+				  const char *seat_name);
+	void (* frame_popup_ungrab)(struct libdecor_plugin *plugin,
+				    struct libdecor_frame *frame,
+				    const char *seat_name);
 
 	bool (* configuration_get_content_size)(struct libdecor_plugin *plugin,
 						struct libdecor_configuration *configuration,
@@ -135,6 +141,10 @@ libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
 
 enum libdecor_capabilities
 libdecor_frame_get_capabilities(const struct libdecor_frame *frame);
+
+void
+libdecor_frame_dismiss_popup(struct libdecor_frame *frame,
+			     const char *seat_name);
 
 struct wl_display *
 libdecor_get_wl_display(struct libdecor *context);
