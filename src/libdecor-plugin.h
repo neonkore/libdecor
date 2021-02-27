@@ -102,6 +102,18 @@ struct libdecor_plugin_interface {
 						struct libdecor_frame *frame,
 						int *content_width,
 						int *content_height);
+
+	/* Reserved */
+	void (* reserved0)(void);
+	void (* reserved1)(void);
+	void (* reserved2)(void);
+	void (* reserved3)(void);
+	void (* reserved4)(void);
+	void (* reserved5)(void);
+	void (* reserved6)(void);
+	void (* reserved7)(void);
+	void (* reserved8)(void);
+	void (* reserved9)(void);
 };
 
 struct wl_surface *

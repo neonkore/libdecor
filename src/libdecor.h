@@ -87,6 +87,18 @@ struct libdecor_interface {
 	void (* error)(struct libdecor *context,
 		       enum libdecor_error error,
 		       const char *message);
+
+	/* Reserved */
+	void (* reserved0)(void);
+	void (* reserved1)(void);
+	void (* reserved2)(void);
+	void (* reserved3)(void);
+	void (* reserved4)(void);
+	void (* reserved5)(void);
+	void (* reserved6)(void);
+	void (* reserved7)(void);
+	void (* reserved8)(void);
+	void (* reserved9)(void);
 };
 
 struct libdecor_frame_interface {
@@ -96,6 +108,18 @@ struct libdecor_frame_interface {
 	void (* close)(struct libdecor_frame *frame,
 		       void *user_data);
 	void (* commit)(void *user_data);
+
+	/* Reserved */
+	void (* reserved0)(void);
+	void (* reserved1)(void);
+	void (* reserved2)(void);
+	void (* reserved3)(void);
+	void (* reserved4)(void);
+	void (* reserved5)(void);
+	void (* reserved6)(void);
+	void (* reserved7)(void);
+	void (* reserved8)(void);
+	void (* reserved9)(void);
 };
 
 void
