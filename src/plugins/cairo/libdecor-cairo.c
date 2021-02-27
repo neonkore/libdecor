@@ -775,16 +775,18 @@ calculate_component_size(struct libdecor_frame_cairo *frame_cairo,
 			 int *component_width,
 			 int *component_height);
 
-static struct border_component *
-get_active_component(struct libdecor_frame_cairo *frame_cairo,
-		     struct wl_surface *surface,
-		     struct seat *seat)
+static void
+update_component_focus(struct libdecor_frame_cairo *frame_cairo,
+		       struct wl_surface *surface,
+		       struct seat *seat)
 {
 	static struct border_component *border_component;
 	static struct border_component *child_component;
+	static struct border_component *focus_component;
 
 	border_component = get_component_for_surface(frame_cairo, surface);
 
+	focus_component = border_component;
 	wl_list_for_each(child_component, &border_component->child_components, link) {
 		int component_x, component_y, component_width, component_height;
 
@@ -794,10 +796,13 @@ get_active_component(struct libdecor_frame_cairo *frame_cairo,
 		if (seat->pointer_x >= component_x &&
 		    seat->pointer_x < component_x + component_width &&
 		    seat->pointer_y >= component_y &&
-		    seat->pointer_y < component_y + component_height)
-			return child_component;
+		    seat->pointer_y < component_y + component_height) {
+			focus_component = child_component;
+			break;
+		}
 	}
-	return border_component;
+
+	frame_cairo->active = focus_component;
 }
 
 static void
@@ -2077,7 +2082,7 @@ pointer_enter(void *data,
 	if (!frame_cairo)
 		return;
 
-	frame_cairo->active = get_active_component(frame_cairo, surface, seat);
+	update_component_focus(frame_cairo, seat->pointer_focus, seat);
 
 	/* update decorations */
 	if (frame_cairo->active) {
@@ -2135,9 +2140,7 @@ pointer_motion(void *data,
 	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
 
 	old_active = frame_cairo->active;
-	frame_cairo->active = get_active_component(frame_cairo,
-						   seat->pointer_focus,
-						   seat);
+	update_component_focus(frame_cairo, seat->pointer_focus, seat);
 	if (old_active != frame_cairo->active) {
 		draw_decoration(frame_cairo);
 		libdecor_frame_toplevel_commit(&frame_cairo->frame);
