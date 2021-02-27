@@ -272,6 +272,12 @@ static void
 sync_active_component(struct libdecor_frame_cairo *frame_cairo,
 		      struct seat *seat);
 
+static void
+synthesize_pointer_enter(struct seat *seat);
+
+static void
+synthesize_pointer_leave(struct seat *seat);
+
 static bool
 own_proxy(struct wl_proxy *proxy)
 {
@@ -2085,31 +2091,16 @@ sync_active_component(struct libdecor_frame_cairo *frame_cairo,
 }
 
 static void
-pointer_enter(void *data,
-	      struct wl_pointer *wl_pointer,
-	      uint32_t serial,
-	      struct wl_surface *surface,
-	      wl_fixed_t surface_x,
-	      wl_fixed_t surface_y)
+synthesize_pointer_enter(struct seat *seat)
 {
+	struct wl_surface *surface;
+	struct libdecor_frame_cairo *frame_cairo;
+
+	surface = seat->pointer_focus;
 	if (!surface)
 		return;
 
-	struct seat *seat = data;
-	struct libdecor_frame_cairo *frame_cairo;
-
-	if (!own_surface(surface))
-		return;
-
 	frame_cairo = wl_surface_get_user_data(surface);
-
-	ensure_cursor_surface(seat);
-
-	seat->pointer_x = wl_fixed_to_int(surface_x);
-	seat->pointer_y = wl_fixed_to_int(surface_y);
-	seat->serial = serial;
-	seat->pointer_focus = surface;
-
 	if (!frame_cairo)
 		return;
 
@@ -2127,29 +2118,70 @@ pointer_enter(void *data,
 }
 
 static void
+synthesize_pointer_leave(struct seat *seat)
+{
+	struct wl_surface *surface;
+	struct libdecor_frame_cairo *frame_cairo;
+
+	surface = seat->pointer_focus;
+	if (!surface)
+		return;
+
+	frame_cairo = wl_surface_get_user_data(surface);
+	if (!frame_cairo)
+		return;
+
+	if (!frame_cairo->active)
+		return;
+
+	frame_cairo->active = NULL;
+	draw_decoration(frame_cairo);
+	libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	update_local_cursor(seat);
+}
+
+static void
+pointer_enter(void *data,
+	      struct wl_pointer *wl_pointer,
+	      uint32_t serial,
+	      struct wl_surface *surface,
+	      wl_fixed_t surface_x,
+	      wl_fixed_t surface_y)
+{
+	struct seat *seat = data;
+
+	if (!surface)
+		return;
+
+	if (!own_surface(surface))
+		return;
+
+	ensure_cursor_surface(seat);
+
+	seat->pointer_x = wl_fixed_to_int(surface_x);
+	seat->pointer_y = wl_fixed_to_int(surface_y);
+	seat->serial = serial;
+	seat->pointer_focus = surface;
+
+	synthesize_pointer_enter(seat);
+}
+
+static void
 pointer_leave(void *data,
 	      struct wl_pointer *wl_pointer,
 	      uint32_t serial,
 	      struct wl_surface *surface)
 {
+	struct seat *seat = data;
+
 	if (!surface)
 		return;
-
-	struct seat *seat = data;
-	struct libdecor_frame_cairo *frame_cairo;
 
 	if (!own_surface(surface))
 		return;
 
-	frame_cairo = wl_surface_get_user_data(surface);
-
+	synthesize_pointer_leave(seat);
 	seat->pointer_focus = NULL;
-	if (frame_cairo) {
-		frame_cairo->active = NULL;
-		draw_decoration(frame_cairo);
-		libdecor_frame_toplevel_commit(&frame_cairo->frame);
-		update_local_cursor(seat);
-	}
 }
 
 static void
