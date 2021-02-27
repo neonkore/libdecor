@@ -266,6 +266,10 @@ struct libdecor_plugin_cairo {
 
 static const char *libdecor_cairo_proxy_tag = "libdecor-cairo";
 
+static void
+sync_active_component(struct libdecor_frame_cairo *frame_cairo,
+		      struct seat *seat);
+
 static bool
 own_proxy(struct wl_proxy *proxy)
 {
@@ -2054,6 +2058,26 @@ send_cursor(struct seat *seat)
 }
 
 static void
+sync_active_component(struct libdecor_frame_cairo *frame_cairo,
+		      struct seat *seat)
+{
+	struct border_component *old_active;
+
+	if (!seat->pointer_focus)
+		return;
+
+	old_active = frame_cairo->active;
+	update_component_focus(frame_cairo, seat->pointer_focus, seat);
+	if (old_active != frame_cairo->active) {
+		draw_decoration(frame_cairo);
+		libdecor_frame_toplevel_commit(&frame_cairo->frame);
+	}
+
+	if (update_local_cursor(seat))
+		send_cursor(seat);
+}
+
+static void
 pointer_enter(void *data,
 	      struct wl_pointer *wl_pointer,
 	      uint32_t serial,
@@ -2129,7 +2153,6 @@ pointer_motion(void *data,
 {
 	struct seat *seat = data;
 	struct libdecor_frame_cairo *frame_cairo;
-	struct border_component *old_active;
 
 	seat->pointer_x = wl_fixed_to_int(surface_x);
 	seat->pointer_y = wl_fixed_to_int(surface_y);
@@ -2139,15 +2162,7 @@ pointer_motion(void *data,
 
 	frame_cairo = wl_surface_get_user_data(seat->pointer_focus);
 
-	old_active = frame_cairo->active;
-	update_component_focus(frame_cairo, seat->pointer_focus, seat);
-	if (old_active != frame_cairo->active) {
-		draw_decoration(frame_cairo);
-		libdecor_frame_toplevel_commit(&frame_cairo->frame);
-	}
-
-	if (update_local_cursor(seat))
-		send_cursor(seat);
+	sync_active_component(frame_cairo, seat);
 }
 
 static void
