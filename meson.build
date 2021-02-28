@@ -6,8 +6,7 @@ project('libdecor', 'c',
 
 version_array = meson.project_version().split('.')
 
-libdecor_api_version = version_array[0]
-libdecor_api_version_string = '@0@'.format(libdecor_api_version)
+libdecor_api_version_string = '@0@.@1@'.format(version_array[0], version_array[1])
 
 plugin_api_version = 1
 plugin_api_version_string = '@0@'.format(plugin_api_version)
