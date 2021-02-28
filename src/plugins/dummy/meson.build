@@ -10,6 +10,4 @@ shared_module('decor-dummy',
   dependencies: [
     libdecor_dep,
   ],
-  install_dir: join_paths(plugindir),
-  install: true,
 )
