@@ -43,6 +43,8 @@
 
 #include "xdg-shell-client-protocol.h"
 
+#include <cairo/cairo-ft.h>
+
 struct window;
 
 static const size_t chk = 16;
@@ -137,6 +139,14 @@ static struct wl_list outputs;
 static bool has_xrgb = false;
 
 static struct window *window;
+
+static void
+clear_cache()
+{
+	/* clear font cache */
+	cairo_debug_reset_static_data();
+	FcFini();
+}
 
 static void
 redraw(struct window *window);
@@ -914,6 +924,8 @@ static void
 handle_close(struct libdecor_frame *frame,
 	     void *user_data)
 {
+	clear_cache();
+
 	exit(EXIT_SUCCESS);
 }
 
@@ -1031,6 +1043,8 @@ main(int argc,
 	libdecor_frame_map(window->frame);
 
 	while (libdecor_dispatch(context, -1) >= 0);
+
+	clear_cache();
 
 	free(window);
 

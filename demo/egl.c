@@ -37,6 +37,8 @@
 #include <GL/gl.h>
 #include <utils.h>
 
+#include <cairo/cairo-ft.h>
+
 static const size_t default_size = 200;
 
 struct client {
@@ -307,6 +309,10 @@ main(int argc, char *argv[])
 	}
 
 out:
+	/* clear font cache */
+	cairo_debug_reset_static_data();
+	FcFini();
+
 	free(window);
 	free(client);
 
