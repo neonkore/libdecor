@@ -1820,6 +1820,31 @@ libdecor_plugin_cairo_configuration_get_content_size(
 	return true;
 }
 
+static bool
+libdecor_plugin_cairo_frame_get_window_size_for(
+		struct libdecor_plugin *plugin,
+		struct libdecor_frame *frame,
+		struct libdecor_state *state,
+		int *window_width,
+		int *window_height)
+{
+	enum libdecor_window_state window_state = state->window_state;
+
+	switch (window_state_to_decoration_type(window_state)) {
+	case DECORATION_TYPE_NONE:
+		*window_width = state->content_width;
+		*window_height = state->content_height;
+		break;
+	case DECORATION_TYPE_ALL:
+	case DECORATION_TYPE_TITLE_ONLY:
+		*window_width = state->content_width;
+		*window_height = state->content_height + TITLE_HEIGHT;
+		break;
+	}
+
+	return true;
+}
+
 static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.destroy = libdecor_plugin_cairo_destroy,
 	.get_fd = libdecor_plugin_cairo_get_fd,
@@ -1836,6 +1861,8 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 
 	.configuration_get_content_size =
 			libdecor_plugin_cairo_configuration_get_content_size,
+	.frame_get_window_size_for =
+			libdecor_plugin_cairo_frame_get_window_size_for,
 };
 
 static void

@@ -61,11 +61,6 @@ struct libdecor {
 	struct wl_list frames;
 };
 
-struct libdecor_state {
-	int content_width;
-	int content_height;
-};
-
 struct libdecor_configuration {
 	uint32_t serial;
 

@@ -103,6 +103,12 @@ struct libdecor_plugin_interface {
 				    struct libdecor_frame *frame,
 				    const char *seat_name);
 
+	bool (* frame_get_window_size_for)(struct libdecor_plugin *plugin,
+					   struct libdecor_frame *frame,
+					   struct libdecor_state *state,
+					   int *window_width,
+					   int *window_height);
+
 	bool (* configuration_get_content_size)(struct libdecor_plugin *plugin,
 						struct libdecor_configuration *configuration,
 						struct libdecor_frame *frame,

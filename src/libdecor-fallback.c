@@ -164,6 +164,19 @@ libdecor_plugin_fallback_configuration_get_content_size(struct libdecor_plugin *
 						      content_height);
 }
 
+static bool
+libdecor_plugin_fallback_frame_get_window_size_for(
+		struct libdecor_plugin *plugin,
+		struct libdecor_frame *frame,
+		struct libdecor_state *state,
+		int *window_width,
+		int *window_height)
+{
+	*window_width = state->content_width;
+	*window_height = state->content_height;
+	return true;
+}
+
 static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.destroy = libdecor_plugin_fallback_destroy,
 	.get_fd = libdecor_plugin_fallback_get_fd,
@@ -177,6 +190,7 @@ static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.frame_popup_grab = libdecor_plugin_fallback_frame_popup_grab,
 	.frame_popup_ungrab = libdecor_plugin_fallback_frame_popup_ungrab,
 	.configuration_get_content_size = libdecor_plugin_fallback_configuration_get_content_size,
+	.frame_get_window_size_for = libdecor_plugin_fallback_frame_get_window_size_for,
 };
 
 struct libdecor_plugin *

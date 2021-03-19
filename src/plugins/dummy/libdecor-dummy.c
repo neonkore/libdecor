@@ -118,6 +118,19 @@ libdecor_plugin_dummy_configuration_get_content_size(
 						      content_height);
 }
 
+static bool
+libdecor_plugin_dummy_frame_get_window_size_for(
+		struct libdecor_plugin *plugin,
+		struct libdecor_frame *frame,
+		struct libdecor_state *state,
+		int *window_width,
+		int *window_height)
+{
+	*window_width = state->content_width;
+	*window_height = state->content_height;
+	return true;
+}
+
 static struct libdecor_plugin_interface dummy_plugin_iface = {
 	.destroy = libdecor_plugin_dummy_destroy,
 
@@ -132,6 +145,8 @@ static struct libdecor_plugin_interface dummy_plugin_iface = {
 
 	.configuration_get_content_size =
 			libdecor_plugin_dummy_configuration_get_content_size,
+	.frame_get_window_size_for =
+			libdecor_plugin_dummy_frame_get_window_size_for,
 };
 
 static struct libdecor_plugin *

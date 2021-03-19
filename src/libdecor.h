@@ -45,7 +45,6 @@ struct xdg_toplevel;
 struct libdecor;
 struct libdecor_frame;
 struct libdecor_configuration;
-struct libdecor_state;
 
 enum libdecor_error {
 	LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
@@ -81,6 +80,13 @@ enum libdecor_capabilities {
 	LIBDECOR_ACTION_MINIMIZE = 1 << 2,
 	LIBDECOR_ACTION_FULLSCREEN = 1 << 3,
 	LIBDECOR_ACTION_CLOSE = 1 << 4,
+};
+
+struct libdecor_state {
+	enum libdecor_window_state window_state;
+
+	int content_width;
+	int content_height;
 };
 
 struct libdecor_interface {
