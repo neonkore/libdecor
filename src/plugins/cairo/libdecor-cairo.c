@@ -1669,16 +1669,6 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 
 	draw_decoration(frame_cairo);
 	set_window_geometry(frame_cairo);
-
-	/* set fixed window size */
-	if (!resizable(frame_cairo)) {
-		libdecor_frame_set_min_content_size(frame,
-						    frame_cairo->content_width,
-						    frame_cairo->content_height);
-		libdecor_frame_set_max_content_size(frame,
-						    frame_cairo->content_width,
-						    frame_cairo->content_height);
-	}
 }
 
 static void
