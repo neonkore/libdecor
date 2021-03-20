@@ -427,13 +427,6 @@ init_shell_surface(struct libdecor_frame *frame)
 		xdg_toplevel_set_app_id(frame_priv->xdg_toplevel,
 					frame_priv->state.app_id);
 	}
-	if (frame_priv->state.min_content_width > 0 ||
-	    frame_priv->state.min_content_height > 0) {
-		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
-					  frame_priv->state.min_content_width,
-					  frame_priv->state.min_content_height);
-
-	}
 
 	if (frame_priv->pending_map)
 		do_map(frame);
@@ -816,10 +809,10 @@ valid_limits(struct libdecor_frame_private *frame_priv)
 
 static void
 libdecor_frame_apply_state(struct libdecor_frame *frame,
-			   struct libdecor_state *state,
-			   struct libdecor_configuration *configuration)
+			   struct libdecor_state *state)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor_plugin *plugin = frame_priv->context->plugin;
 
 	frame_priv->content_width = state->content_width;
 	frame_priv->content_height = state->content_height;
@@ -839,16 +832,40 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 		free(err_msg);
 	}
 
-	xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
-				  frame_priv->state.min_content_width,
-				  frame_priv->state.min_content_height);
-	xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
-				  frame_priv->state.max_content_width,
-				  frame_priv->state.max_content_height);
+	if (frame_priv->state.min_content_width > 0 &&
+	    frame_priv->state.min_content_height > 0) {
+		struct libdecor_state state_min;
+		int win_min_width, win_min_height;
 
-	if (configuration) {
-		if (configuration->has_window_state)
-			frame_priv->window_state = configuration->window_state;
+		state_min.content_width = frame_priv->state.min_content_width;
+		state_min.content_height = frame_priv->state.min_content_height;
+		state_min.window_state = state->window_state;
+
+		plugin->iface->frame_get_window_size_for(
+					plugin, frame, &state_min,
+					&win_min_width, &win_min_height);
+		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
+					  win_min_width, win_min_height);
+	} else {
+		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel, 0, 0);
+	}
+
+	if (frame_priv->state.max_content_width > 0 &&
+	    frame_priv->state.max_content_height > 0) {
+		struct libdecor_state state_max;
+		int win_max_width, win_max_height;
+
+		state_max.content_width = frame_priv->state.max_content_width;
+		state_max.content_height = frame_priv->state.max_content_height;
+		state_max.window_state = state->window_state;
+
+		plugin->iface->frame_get_window_size_for(
+					plugin, frame, &state_max,
+					&win_max_width, &win_max_height);
+		xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
+					  win_max_width, win_max_height);
+	} else {
+		xdg_toplevel_set_max_size(frame_priv->xdg_toplevel, 0, 0);
 	}
 }
 
@@ -869,7 +886,14 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	libdecor_frame_apply_state(frame, state, configuration);
+	if (configuration && configuration->has_window_state) {
+		frame_priv->window_state = configuration->window_state;
+		state->window_state = configuration->window_state;
+	} else {
+		state->window_state = frame_priv->window_state;
+	}
+
+	libdecor_frame_apply_state(frame, state);
 
 	switch (frame_priv->decoration_mode) {
 	case ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
