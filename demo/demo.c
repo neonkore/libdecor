@@ -36,6 +36,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wayland-cursor.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "libdecor.h"
 #include "utils.h"
@@ -99,6 +100,7 @@ struct window {
 
 struct seat {
 	struct wl_seat *wl_seat;
+	struct wl_keyboard *wl_keyboard;
 	struct wl_pointer *wl_pointer;
 	struct wl_list link;
 	struct wl_list pointer_outputs;
@@ -111,6 +113,9 @@ struct seat {
 	wl_fixed_t pointer_sx;
 	wl_fixed_t pointer_sy;
 	char *name;
+
+	struct xkb_context *xkb_context;
+	struct xkb_state *xkb_state;
 };
 
 struct output {
@@ -540,6 +545,164 @@ static struct wl_pointer_listener pointer_listener = {
 };
 
 static void
+keyboard_keymap(void *data,
+		struct wl_keyboard *wl_keyboard,
+		uint32_t format,
+		int32_t fd,
+		uint32_t size)
+{
+	struct seat *seat = data;
+
+	if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
+	  close(fd);
+	  return;
+	}
+
+	char *map_str = (char *)(mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0));
+	if (map_str == MAP_FAILED) {
+		close(fd);
+		fprintf(stderr, "keymap mmap failed: %s", strerror(errno));
+		return;
+	}
+
+	struct xkb_keymap *keymap = xkb_keymap_new_from_string(
+				seat->xkb_context, map_str,
+				XKB_KEYMAP_FORMAT_TEXT_V1,
+				XKB_KEYMAP_COMPILE_NO_FLAGS);
+	munmap(map_str, size);
+	close(fd);
+
+	if (!keymap)
+		return;
+
+	seat->xkb_state = xkb_state_new(keymap);
+
+	xkb_keymap_unref(keymap);
+}
+
+static void
+keyboard_enter(void *data,
+	       struct wl_keyboard *wl_keyboard,
+	       uint32_t serial,
+	       struct wl_surface *surface,
+	       struct wl_array *keys)
+{
+}
+
+static void
+keyboard_leave(void *data,
+	       struct wl_keyboard *wl_keyboard,
+	       uint32_t serial,
+	       struct wl_surface *surface)
+{
+}
+
+static void
+keyboard_key(void *data,
+	     struct wl_keyboard *wl_keyboard,
+	      uint32_t serial,
+	     uint32_t time,
+	     uint32_t key,
+	     uint32_t state)
+{
+	struct seat *seat = data;
+
+	if (state & WL_KEYBOARD_KEY_STATE_PRESSED) {
+		char utf8_buf[6];
+
+		xkb_state_key_get_utf8(seat->xkb_state, key + 8,
+				       utf8_buf, sizeof(utf8_buf));
+
+		switch (utf8_buf[0]) {
+		case 27: /* ESC */
+			printf("close\n");
+			libdecor_frame_close(window->frame);
+			break;
+		case '1': /* 1, toggle resizeability */
+			if (libdecor_frame_has_capability(
+				    window->frame, LIBDECOR_ACTION_RESIZE)) {
+				printf("set fixed-size\n");
+				libdecor_frame_unset_capabilities(window->frame,
+							LIBDECOR_ACTION_RESIZE);
+			}
+			else {
+				printf("set resizeable\n");
+				libdecor_frame_set_capabilities(window->frame,
+							LIBDECOR_ACTION_RESIZE);
+			}
+			break;
+		case '2': /* 2, maximize */
+			printf("maximize\n");
+			libdecor_frame_set_maximized(window->frame);
+			break;
+		case '3': /* 3, un-maximize / restore */
+			printf("un-maximize\n");
+			libdecor_frame_unset_maximized(window->frame);
+			break;
+		case '4': /* 4, set fullscreen */
+			printf("fullscreen\n");
+			libdecor_frame_set_fullscreen(window->frame, NULL);
+			break;
+		case '5': /* 5, un-set fullscreen / restore */
+			printf("un-fullscreen\n");
+			libdecor_frame_unset_fullscreen(window->frame);
+			break;
+		case '-':
+		case '+':
+			printf("resize\n");
+			{
+				struct libdecor_state *state;
+				const int dd = (utf8_buf[0] == '-' ? -1 : +1) * chk/2;
+				/* commit changes to decorations */
+				state = libdecor_state_new(
+						window->configured_width + dd,
+						window->configured_height + dd);
+				libdecor_frame_commit(window->frame, state, NULL);
+				libdecor_state_free(state);
+				/* force redraw of content and commit */
+				window->configured_width += dd;
+				window->configured_height += dd;
+				redraw(window);
+			}
+			break;
+		}
+	}
+}
+
+static void
+keyboard_modifiers(void *data,
+		   struct wl_keyboard *wl_keyboard,
+		   uint32_t serial,
+		   uint32_t mods_depressed,
+		   uint32_t mods_latched,
+		   uint32_t mods_locked,
+		   uint32_t group)
+{
+	struct seat *seat = data;
+
+	xkb_state_update_mask(seat->xkb_state,
+			      mods_depressed, mods_latched, mods_locked,
+			      0, 0, group);
+}
+
+static void
+keyboard_repeat_info(void *data,
+		     struct wl_keyboard *wl_keyboard,
+		     int32_t rate,
+		     int32_t delay)
+{
+}
+
+static struct wl_keyboard_listener keyboard_listener = {
+	keyboard_keymap,
+	keyboard_enter,
+	keyboard_leave,
+	keyboard_key,
+	keyboard_modifiers,
+	keyboard_repeat_info,
+};
+
+static void
 seat_capabilities(void *data,
 		  struct wl_seat *wl_seat,
 		  uint32_t capabilities)
@@ -556,6 +719,19 @@ seat_capabilities(void *data,
 		   seat->wl_pointer) {
 		wl_pointer_release(seat->wl_pointer);
 		seat->wl_pointer = NULL;
+	}
+
+	if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD &&
+	    !seat->wl_keyboard) {
+		seat->wl_keyboard = wl_seat_get_keyboard(wl_seat);
+		seat->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+		wl_keyboard_add_listener(seat->wl_keyboard, &keyboard_listener,
+					 seat);
+	} else if (!(capabilities & WL_SEAT_CAPABILITY_KEYBOARD) &&
+		   seat->wl_keyboard) {
+		xkb_context_unref(seat->xkb_context);
+		wl_keyboard_release(seat->wl_keyboard);
+		seat->wl_keyboard = NULL;
 	}
 }
 
@@ -1005,6 +1181,9 @@ main(int argc,
 	struct wl_registry *wl_registry;
 	struct libdecor *context;
 	struct output *output;
+
+	/* write all output to stdout immediately */
+	setbuf(stdout, NULL);
 
 	wl_display = wl_display_connect(NULL);
 	if (!wl_display) {

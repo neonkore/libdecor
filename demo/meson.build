@@ -8,6 +8,8 @@ egl_dep = dependency('egl')
 gl_dep = dependency('gl')
 wayland_egl_dep = dependency('wayland-egl')
 
+xkb_dep = dependency('xkbcommon')
+
 xdg_shell_path = join_paths(protocols_dir, 'stable', 'xdg-shell', 'xdg-shell.xml')
 
 xdg_shell_client_header = custom_target('xdg-shell client header (demo)',
@@ -44,6 +46,7 @@ executable('libdecor-demo',
     libdecor_dep,
     wayland_cursor_dep,
     cursor_settings_dep,
+    xkb_dep,
     cairo_dep,
     font_dep],
   install: false,
