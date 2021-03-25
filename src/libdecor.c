@@ -873,6 +873,21 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 		free(err_msg);
 	}
 
+	/* If the frame is configured as non-resizable before the first
+	 * configure event is received, we have to manually set the min/max
+	 * limits with the configured content size afterwards. */
+	if (!libdecor_frame_has_capability(frame, LIBDECOR_ACTION_RESIZE)) {
+		frame_priv->state.content_limits.min_width =
+				frame_priv->content_width;
+		frame_priv->state.content_limits.max_width =
+				frame_priv->content_width;
+
+		frame_priv->state.content_limits.min_height =
+				frame_priv->content_height;
+		frame_priv->state.content_limits.max_height =
+				frame_priv->content_height;
+	}
+
 	if (frame_priv->state.content_limits.min_width > 0 &&
 	    frame_priv->state.content_limits.min_height > 0) {
 		struct libdecor_state state_min;
