@@ -1810,10 +1810,6 @@ libdecor_plugin_cairo_configuration_get_content_size(
 						    &win_height))
 		return false;
 
-	/*
-	 * 'libdecor_configuration_get_window_state' returns the pending state,
-	 * while 'libdecor_frame_get_window_state' gives the current state
-	 */
 	enum libdecor_window_state state;
 	if (!libdecor_configuration_get_window_state(configuration, &state)) {
 		return false;
