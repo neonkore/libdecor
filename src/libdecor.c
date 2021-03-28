@@ -61,6 +61,13 @@ struct libdecor {
 	struct wl_list frames;
 };
 
+struct libdecor_limits {
+	int min_width;
+	int min_height;
+	int max_width;
+	int max_height;
+};
+
 struct libdecor_configuration {
 	uint32_t serial;
 
@@ -91,10 +98,7 @@ struct libdecor_frame_private {
 	struct {
 		char *app_id;
 		char *title;
-		int min_content_width;
-		int min_content_height;
-		int max_content_width;
-		int max_content_height;
+		struct libdecor_limits content_limits;
 		struct xdg_toplevel *parent;
 	} state;
 
@@ -112,6 +116,9 @@ struct libdecor_frame_private {
 	enum zxdg_toplevel_decoration_v1_mode decoration_mode;
 
 	enum libdecor_capabilities capabilities;
+
+	/* original limits for interactive resize */
+	struct libdecor_limits interactive_limits;
 };
 
 static bool
@@ -564,32 +571,66 @@ libdecor_frame_set_app_id(struct libdecor_frame *frame,
 	xdg_toplevel_set_app_id(frame_priv->xdg_toplevel, app_id);
 }
 
+static void
+notify_on_capability_change(struct libdecor_frame *frame,
+			    const enum libdecor_capabilities old_capabilities)
+{
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+	struct libdecor_state *state;
+
+	if (frame->priv->capabilities == old_capabilities)
+		return;
+
+	if (frame->priv->content_width == 0 ||
+	    frame->priv->content_height == 0)
+		return;
+
+	plugin->iface->frame_property_changed(plugin, frame);
+
+	if (!libdecor_frame_has_capability(frame, LIBDECOR_ACTION_RESIZE)) {
+		frame->priv->interactive_limits = frame->priv->state.content_limits;
+		/* set fixed window size */
+		libdecor_frame_set_min_content_size(frame,
+						    frame->priv->content_width,
+						    frame->priv->content_height);
+		libdecor_frame_set_max_content_size(frame,
+						    frame->priv->content_width,
+						    frame->priv->content_height);
+	} else {
+		/* restore old limits */
+		frame->priv->state.content_limits = frame->priv->interactive_limits;
+	}
+
+	state = libdecor_state_new(frame->priv->content_width,
+				   frame->priv->content_height);
+	libdecor_frame_commit(frame, state, NULL);
+	libdecor_state_free(state);
+
+	libdecor_frame_toplevel_commit(frame);
+}
+
 LIBDECOR_EXPORT void
 libdecor_frame_set_capabilities(struct libdecor_frame *frame,
 				enum libdecor_capabilities capabilities)
 {
-	struct libdecor_plugin *plugin = frame->priv->context->plugin;
 	const enum libdecor_capabilities old_capabilities =
 			frame->priv->capabilities;
 
 	frame->priv->capabilities |= capabilities;
 
-	if (frame->priv->capabilities != old_capabilities)
-		plugin->iface->frame_property_changed(plugin, frame);
+	notify_on_capability_change(frame, old_capabilities);
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_unset_capabilities(struct libdecor_frame *frame,
 				  enum libdecor_capabilities capabilities)
 {
-	struct libdecor_plugin *plugin = frame->priv->context->plugin;
 	const enum libdecor_capabilities old_capabilities =
 			frame->priv->capabilities;
 
 	frame->priv->capabilities &= ~capabilities;
 
-	if (frame->priv->capabilities != old_capabilities)
-		plugin->iface->frame_property_changed(plugin, frame);
+	notify_on_capability_change(frame, old_capabilities);
 }
 
 LIBDECOR_EXPORT bool
@@ -672,8 +713,8 @@ libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
-	frame_priv->state.max_content_width = content_width;
-	frame_priv->state.max_content_height = content_height;
+	frame_priv->state.content_limits.max_width = content_width;
+	frame_priv->state.content_limits.max_height = content_height;
 }
 
 LIBDECOR_EXPORT void
@@ -683,8 +724,8 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
-	frame_priv->state.min_content_width = content_width;
-	frame_priv->state.min_content_height = content_height;
+	frame_priv->state.content_limits.min_width = content_width;
+	frame_priv->state.content_limits.min_height = content_height;
 }
 
 LIBDECOR_EXPORT void
@@ -792,16 +833,16 @@ libdecor_frame_close(struct libdecor_frame *frame)
 bool
 valid_limits(struct libdecor_frame_private *frame_priv)
 {
-	if (frame_priv->state.min_content_width > 0 &&
-	    frame_priv->state.max_content_width > 0 &&
-	    frame_priv->state.min_content_width >
-	    frame_priv->state.max_content_width)
+	if (frame_priv->state.content_limits.min_width > 0 &&
+	    frame_priv->state.content_limits.max_width > 0 &&
+	    frame_priv->state.content_limits.min_width >
+	    frame_priv->state.content_limits.max_width)
 		return false;
 
-	if (frame_priv->state.min_content_height > 0 &&
-	    frame_priv->state.max_content_height > 0 &&
-	    frame_priv->state.min_content_height >
-	    frame_priv->state.max_content_height)
+	if (frame_priv->state.content_limits.min_height > 0 &&
+	    frame_priv->state.content_limits.max_height > 0 &&
+	    frame_priv->state.content_limits.min_height >
+	    frame_priv->state.content_limits.max_height)
 		return false;
 
 	return true;
@@ -821,10 +862,10 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 		char *err_msg;
 		asprintf(&err_msg,
 			 "minimum size (%i,%i) must be smaller than maximum size (%i,%i)",
-			 frame_priv->state.min_content_width,
-			 frame_priv->state.min_content_height,
-			 frame_priv->state.max_content_width,
-			 frame_priv->state.max_content_height);
+			 frame_priv->state.content_limits.min_width,
+			 frame_priv->state.content_limits.min_height,
+			 frame_priv->state.content_limits.max_width,
+			 frame_priv->state.content_limits.max_height);
 		libdecor_notify_plugin_error(
 			frame_priv->context,
 			LIBDECOR_ERROR_INVALID_FRAME_CONFIGURATION,
@@ -832,13 +873,13 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 		free(err_msg);
 	}
 
-	if (frame_priv->state.min_content_width > 0 &&
-	    frame_priv->state.min_content_height > 0) {
+	if (frame_priv->state.content_limits.min_width > 0 &&
+	    frame_priv->state.content_limits.min_height > 0) {
 		struct libdecor_state state_min;
 		int win_min_width, win_min_height;
 
-		state_min.content_width = frame_priv->state.min_content_width;
-		state_min.content_height = frame_priv->state.min_content_height;
+		state_min.content_width = frame_priv->state.content_limits.min_width;
+		state_min.content_height = frame_priv->state.content_limits.min_height;
 		state_min.window_state = state->window_state;
 
 		plugin->iface->frame_get_window_size_for(
@@ -850,13 +891,13 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel, 0, 0);
 	}
 
-	if (frame_priv->state.max_content_width > 0 &&
-	    frame_priv->state.max_content_height > 0) {
+	if (frame_priv->state.content_limits.max_width > 0 &&
+	    frame_priv->state.content_limits.max_height > 0) {
 		struct libdecor_state state_max;
 		int win_max_width, win_max_height;
 
-		state_max.content_width = frame_priv->state.max_content_width;
-		state_max.content_height = frame_priv->state.max_content_height;
+		state_max.content_width = frame_priv->state.content_limits.max_width;
+		state_max.content_height = frame_priv->state.content_limits.max_height;
 		state_max.window_state = state->window_state;
 
 		plugin->iface->frame_get_window_size_for(
