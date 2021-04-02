@@ -858,6 +858,11 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 	frame_priv->content_width = state->content_width;
 	frame_priv->content_height = state->content_height;
 
+	/* do not set limits in maximized or fullscreen state */
+	if (state->window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
+	    state->window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)
+		return;
+
 	if (!valid_limits(frame_priv)) {
 		char *err_msg;
 		asprintf(&err_msg,
