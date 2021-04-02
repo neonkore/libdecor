@@ -1173,6 +1173,26 @@ static struct wl_surface_listener surface_listener = {
 	surface_leave,
 };
 
+static void
+free_outputs()
+{
+	struct output *output;
+	struct window_output *window_output, *window_output_tmp;
+
+	wl_list_for_each(output, &outputs, link) {
+		wl_list_for_each_safe(window_output, window_output_tmp, &window->outputs, link) {
+			if (window_output->output == output) {
+				wl_list_remove(&window_output->link);
+				free(window_output);
+			}
+		}
+		wl_list_remove(&output->link);
+		wl_output_destroy(output->wl_output);
+		free(output);
+		break;
+	}
+}
+
 int
 main(int argc,
      char **argv)
@@ -1222,6 +1242,8 @@ main(int argc,
 	libdecor_frame_map(window->frame);
 
 	while (libdecor_dispatch(context, -1) >= 0);
+
+	free_outputs();
 
 	clear_cache();
 
