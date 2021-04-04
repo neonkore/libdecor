@@ -171,7 +171,7 @@ window_size_to_content_size(struct libdecor_configuration *configuration,
 	}
 }
 
-LIBDECOR_EXPORT bool
+bool
 libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,
 					struct libdecor_frame *frame,
 					int *width,

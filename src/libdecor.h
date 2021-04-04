@@ -266,12 +266,6 @@ libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame);
 
 
 bool
-libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,
-					struct libdecor_frame *frame,
-					int *width,
-					int *height);
-
-bool
 libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
 				       int *width,
 				       int *height);
