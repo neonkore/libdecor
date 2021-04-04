@@ -109,7 +109,7 @@ struct libdecor_interface {
 
 struct libdecor_frame_interface {
 	void (* configure)(struct libdecor_frame *frame,
-			   struct libdecor_configuration *configuration,
+			   struct libdecor_state *state,
 			   void *user_data);
 	void (* close)(struct libdecor_frame *frame,
 		       void *user_data);
@@ -264,13 +264,6 @@ libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
 struct xdg_toplevel *
 libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame);
 
-struct libdecor_state *
-libdecor_state_new(int width,
-		   int height);
-
-
-void
-libdecor_state_free(struct libdecor_state *state);
 
 bool
 libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,

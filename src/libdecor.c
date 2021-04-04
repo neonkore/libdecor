@@ -131,25 +131,6 @@ streql(const char *str1, const char *str2)
 static void
 do_map(struct libdecor_frame *frame);
 
-LIBDECOR_EXPORT struct libdecor_state *
-libdecor_state_new(int width,
-		   int height)
-{
-	struct libdecor_state *state;
-
-	state = zalloc(sizeof *state);
-	state->content_width = width;
-	state->content_height = height;
-
-	return state;
-}
-
-LIBDECOR_EXPORT void
-libdecor_state_free(struct libdecor_state *state)
-{
-	free(state);
-}
-
 static struct libdecor_configuration *
 libdecor_configuration_new(void)
 {
@@ -251,6 +232,7 @@ xdg_surface_configure(void *user_data,
 	struct libdecor_frame *frame = user_data;
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	struct libdecor_configuration *configuration;
+	struct libdecor_state state;
 
 	configuration = frame_priv->pending_configuration;
 	frame_priv->pending_configuration = NULL;
@@ -260,9 +242,20 @@ xdg_surface_configure(void *user_data,
 
 	configuration->serial = serial;
 
+	if (!libdecor_configuration_get_content_size(
+				configuration, frame,
+				&state.content_width, &state.content_height)) {
+		state.content_width = 0;
+		state.content_height = 0;
+	}
+
 	frame_priv->iface->configure(frame,
-				     configuration,
+				     &state,
 				     frame_priv->user_data);
+
+	libdecor_frame_commit(frame, &state, configuration);
+
+	libdecor_frame_toplevel_commit(frame);
 
 	libdecor_configuration_free(configuration);
 }
@@ -576,7 +569,7 @@ notify_on_capability_change(struct libdecor_frame *frame,
 			    const enum libdecor_capabilities old_capabilities)
 {
 	struct libdecor_plugin *plugin = frame->priv->context->plugin;
-	struct libdecor_state *state;
+	struct libdecor_state state;
 
 	if (frame->priv->capabilities == old_capabilities)
 		return;
@@ -601,10 +594,9 @@ notify_on_capability_change(struct libdecor_frame *frame,
 		frame->priv->state.content_limits = frame->priv->interactive_limits;
 	}
 
-	state = libdecor_state_new(frame->priv->content_width,
-				   frame->priv->content_height);
-	libdecor_frame_commit(frame, state, NULL);
-	libdecor_state_free(state);
+	state.content_width = frame->priv->content_width;
+	state.content_height = frame->priv->content_height;
+	libdecor_frame_commit(frame, &state, NULL);
 
 	libdecor_frame_toplevel_commit(frame);
 }

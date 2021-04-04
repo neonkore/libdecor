@@ -651,14 +651,12 @@ keyboard_key(void *data,
 		case '+':
 			printf("resize\n");
 			{
-				struct libdecor_state *state;
+				struct libdecor_state state;
 				const int dd = (utf8_buf[0] == '-' ? -1 : +1) * chk/2;
 				/* commit changes to decorations */
-				state = libdecor_state_new(
-						window->configured_width + dd,
-						window->configured_height + dd);
-				libdecor_frame_commit(window->frame, state, NULL);
-				libdecor_state_free(state);
+				state.content_width = window->configured_width + dd;
+				state.content_height = window->configured_height + dd;
+				libdecor_frame_commit(window->frame, &state, NULL);
 				/* force redraw of content and commit */
 				window->configured_width += dd;
 				window->configured_height += dd;
@@ -1058,40 +1056,35 @@ redraw(struct window *window)
 	wl_surface_damage_buffer(window->wl_surface, 0, 0,
 				 window->configured_width * window->scale,
 				 window->configured_height * window->scale);
-	wl_surface_commit(window->wl_surface);
 }
 
 static void
 handle_configure(struct libdecor_frame *frame,
-		 struct libdecor_configuration *configuration,
+		 struct libdecor_state *state,
 		 void *user_data)
 {
 	struct window *window = user_data;
 	int width, height;
-	enum libdecor_window_state window_state;
-	struct libdecor_state *state;
 
-	if (!libdecor_configuration_get_content_size(configuration, frame,
-						     &width, &height)) {
+	/* choose new content size */
+	if (state->content_width > 0 && state->content_height > 0) {
+		width = state->content_width;
+		height = state->content_height;
+	}
+	else if (window->content_width > 0 && window->content_height > 0) {
 		width = window->content_width;
 		height = window->content_height;
 	}
+	else {
+		width = DEFAULT_WIDTH;
+		height = DEFAULT_HEIGHT;
+	}
 
-	width = (width == 0) ? DEFAULT_WIDTH : width;
-	height = (height == 0) ? DEFAULT_HEIGHT : height;
+	/* set new size for frame state and content */
+	state->content_width = window->configured_width = width;
+	state->content_height = window->configured_height = height;
 
-	window->configured_width = width;
-	window->configured_height = height;
-
-	if (!libdecor_configuration_get_window_state(configuration,
-						     &window_state))
-		window_state = LIBDECOR_WINDOW_STATE_NONE;
-
-	window->window_state = window_state;
-
-	state = libdecor_state_new(width, height);
-	libdecor_frame_commit(frame, state, configuration);
-	libdecor_state_free(state);
+	window->window_state = state->window_state;
 
 	redraw(window);
 }

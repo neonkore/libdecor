@@ -62,28 +62,32 @@ struct window {
 
 static void
 frame_configure(struct libdecor_frame *frame,
-		struct libdecor_configuration *configuration,
+		struct libdecor_state *state,
 		void *user_data)
 {
 	struct window *window = user_data;
-	struct libdecor_state *state;
 	int width, height;
 
-	if (!libdecor_configuration_get_content_size(configuration, frame,
-						     &width, &height)) {
-		height = width = default_size;
+	/* choose new content size */
+	if (state->content_width > 0 && state->content_height > 0) {
+		width = state->content_width;
+		height = state->content_height;
+	}
+	else if (window->content_width > 0 && window->content_height > 0) {
+		width = window->content_width;
+		height = window->content_height;
+	}
+	else {
+		width = height = default_size;
 	}
 
-	window->content_width = width;
-	window->content_height = height;
+	/* set new size for frame state and content */
+	state->content_width = window->content_width = width;
+	state->content_height = window->content_height = height;
 
 	wl_egl_window_resize(window->egl_window,
 			     window->content_width, window->content_height,
 			     0, 0);
-
-	state = libdecor_state_new(width, height);
-	libdecor_frame_commit(frame, state, configuration);
-	libdecor_state_free(state);
 
 	window->configured = true;
 }
