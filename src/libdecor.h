@@ -264,16 +264,6 @@ libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
 struct xdg_toplevel *
 libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame);
 
-
-bool
-libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
-				       int *width,
-				       int *height);
-
-bool
-libdecor_configuration_get_window_state(struct libdecor_configuration *configuration,
-					enum libdecor_window_state *window_state);
-
 #ifdef __cplusplus
 }
 #endif
