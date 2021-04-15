@@ -805,7 +805,8 @@ update_component_focus(struct libdecor_frame_cairo *frame_cairo,
 
 	focus_component = border_component;
 	wl_list_for_each(child_component, &border_component->child_components, link) {
-		int component_x, component_y, component_width, component_height;
+		int component_x = 0, component_y = 0;
+		int component_width = 0, component_height = 0;
 
 		calculate_component_size(frame_cairo, child_component->type,
 					 &component_x, &component_y,
