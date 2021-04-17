@@ -849,19 +849,11 @@ valid_limits(struct libdecor_frame_private *frame_priv)
 }
 
 static void
-libdecor_frame_apply_state(struct libdecor_frame *frame,
-			   struct libdecor_state *state)
+libdecor_frame_apply_limits(struct libdecor_frame *frame,
+			    enum libdecor_window_state window_state)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	struct libdecor_plugin *plugin = frame_priv->context->plugin;
-
-	frame_priv->content_width = state->content_width;
-	frame_priv->content_height = state->content_height;
-
-	/* do not set limits in maximized or fullscreen state */
-	if (state->window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
-	    state->window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)
-		return;
 
 	if (!valid_limits(frame_priv)) {
 		char *err_msg;
@@ -900,7 +892,7 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 
 		state_min.content_width = frame_priv->state.content_limits.min_width;
 		state_min.content_height = frame_priv->state.content_limits.min_height;
-		state_min.window_state = state->window_state;
+		state_min.window_state = window_state;
 
 		plugin->iface->frame_get_window_size_for(
 					plugin, frame, &state_min,
@@ -918,7 +910,7 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 
 		state_max.content_width = frame_priv->state.content_limits.max_width;
 		state_max.content_height = frame_priv->state.content_limits.max_height;
-		state_max.window_state = state->window_state;
+		state_max.window_state = window_state;
 
 		plugin->iface->frame_get_window_size_for(
 					plugin, frame, &state_max,
@@ -927,6 +919,22 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 					  win_max_width, win_max_height);
 	} else {
 		xdg_toplevel_set_max_size(frame_priv->xdg_toplevel, 0, 0);
+	}
+}
+
+static void
+libdecor_frame_apply_state(struct libdecor_frame *frame,
+			   struct libdecor_state *state)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	frame_priv->content_width = state->content_width;
+	frame_priv->content_height = state->content_height;
+
+	/* do not set limits in maximized or fullscreen state */
+	if (!(state->window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
+	      state->window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)) {
+		libdecor_frame_apply_limits(frame, state->window_state);
 	}
 }
 
