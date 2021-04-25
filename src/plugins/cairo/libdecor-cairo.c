@@ -680,8 +680,16 @@ static void
 libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 				 struct libdecor_frame *frame)
 {
+	struct libdecor_plugin_cairo *plugin_cairo =
+		(struct libdecor_plugin_cairo *) plugin;
 	struct libdecor_frame_cairo *frame_cairo =
 		(struct libdecor_frame_cairo *) frame;
+	struct seat *seat;
+
+	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
+		if (wl_surface_get_user_data(seat->pointer_focus) == frame_cairo)
+			seat->pointer_focus = NULL;
+	}
 
 	free_border_component(&frame_cairo->title_bar.title);
 	free_border_component(&frame_cairo->title_bar.min);
