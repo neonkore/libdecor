@@ -163,4 +163,13 @@ libdecor_notify_plugin_error(struct libdecor *context,
 			     enum libdecor_error error,
 			     const char *message);
 
+int
+libdecor_state_get_content_width (struct libdecor_state *state);
+
+int
+libdecor_state_get_content_height (struct libdecor_state *state);
+
+enum libdecor_window_state
+libdecor_state_get_window_state(struct libdecor_state *state);
+
 #endif /* LIBDECOR_PLUGIN_H */

@@ -61,6 +61,13 @@ struct libdecor {
 	struct wl_list frames;
 };
 
+struct libdecor_state {
+	enum libdecor_window_state window_state;
+
+	int content_width;
+	int content_height;
+};
+
 struct libdecor_limits {
 	int min_width;
 	int min_height;
@@ -130,6 +137,24 @@ streql(const char *str1, const char *str2)
 
 static void
 do_map(struct libdecor_frame *frame);
+
+LIBDECOR_EXPORT int
+libdecor_state_get_content_width(struct libdecor_state *state)
+{
+	return state->content_width;
+}
+
+LIBDECOR_EXPORT int
+libdecor_state_get_content_height(struct libdecor_state *state)
+{
+	return state->content_height;
+}
+
+LIBDECOR_EXPORT enum libdecor_window_state
+libdecor_state_get_window_state(struct libdecor_state *state)
+{
+	return state->window_state;
+}
 
 LIBDECOR_EXPORT struct libdecor_state *
 libdecor_state_new(int width,

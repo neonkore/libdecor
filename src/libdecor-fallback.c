@@ -172,8 +172,8 @@ libdecor_plugin_fallback_frame_get_window_size_for(
 		int *window_width,
 		int *window_height)
 {
-	*window_width = state->content_width;
-	*window_height = state->content_height;
+	*window_width = libdecor_state_get_content_width (state);
+	*window_height = libdecor_state_get_content_height (state);
 	return true;
 }
 

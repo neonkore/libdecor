@@ -1838,17 +1838,19 @@ libdecor_plugin_cairo_frame_get_window_size_for(
 		int *window_width,
 		int *window_height)
 {
-	enum libdecor_window_state window_state = state->window_state;
+	enum libdecor_window_state window_state =
+		libdecor_state_get_window_state (state);
 
 	switch (window_state_to_decoration_type(window_state)) {
 	case DECORATION_TYPE_NONE:
-		*window_width = state->content_width;
-		*window_height = state->content_height;
+		*window_width = libdecor_state_get_content_width (state);
+		*window_height = libdecor_state_get_content_height (state);
 		break;
 	case DECORATION_TYPE_ALL:
 	case DECORATION_TYPE_TITLE_ONLY:
-		*window_width = state->content_width;
-		*window_height = state->content_height + TITLE_HEIGHT;
+		*window_width = libdecor_state_get_content_width (state);
+		*window_height =
+			libdecor_state_get_content_height (state) + TITLE_HEIGHT;
 		break;
 	}
 
