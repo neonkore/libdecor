@@ -994,6 +994,9 @@ main(int argc,
 	struct libdecor *context;
 	struct output *output;
 
+	/* write all output to stdout immediately */
+	setbuf(stdout, NULL);
+
 	wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
 		fprintf(stderr, "No Wayland connection\n");
