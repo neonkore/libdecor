@@ -687,7 +687,8 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	struct seat *seat;
 
 	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
-		if (wl_surface_get_user_data(seat->pointer_focus) == frame_cairo)
+		if (seat->pointer_focus != NULL &&
+		    wl_surface_get_user_data(seat->pointer_focus) == frame_cairo)
 			seat->pointer_focus = NULL;
 	}
 
