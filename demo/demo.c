@@ -151,6 +151,11 @@ resize(struct window *window, int width, int height)
 {
 	struct libdecor_state *state;
 
+	if (!libdecor_frame_is_floating(window->frame)) {
+		printf("... ignoring in non-floating mode\n");
+		return;
+	}
+
 	/* commit changes to decorations */
 	state = libdecor_state_new( width, height);
 	libdecor_frame_commit(window->frame, state, NULL);
