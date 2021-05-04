@@ -246,6 +246,9 @@ libdecor_frame_set_fullscreen(struct libdecor_frame *frame,
 void
 libdecor_frame_unset_fullscreen(struct libdecor_frame *frame);
 
+bool
+libdecor_frame_is_floating(struct libdecor_frame *frame);
+
 void
 libdecor_frame_close(struct libdecor_frame *frame);
 

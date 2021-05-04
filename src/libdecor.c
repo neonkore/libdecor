@@ -128,6 +128,12 @@ struct libdecor_frame_private {
 	struct libdecor_limits interactive_limits;
 };
 
+/* gather all states at which a window is non-floating */
+static const enum libdecor_window_state states_non_floating =
+	LIBDECOR_WINDOW_STATE_MAXIMIZED | LIBDECOR_WINDOW_STATE_FULLSCREEN |
+	LIBDECOR_WINDOW_STATE_TILED_LEFT | LIBDECOR_WINDOW_STATE_TILED_RIGHT |
+	LIBDECOR_WINDOW_STATE_TILED_TOP | LIBDECOR_WINDOW_STATE_TILED_BOTTOM;
+
 static bool
 streql(const char *str1, const char *str2)
 {
@@ -137,6 +143,12 @@ streql(const char *str1, const char *str2)
 
 static void
 do_map(struct libdecor_frame *frame);
+
+static bool
+state_is_floating(enum libdecor_window_state window_state)
+{
+	return !(window_state & states_non_floating);
+}
 
 LIBDECOR_EXPORT int
 libdecor_state_get_content_width(struct libdecor_state *state)
@@ -847,6 +859,12 @@ LIBDECOR_EXPORT void
 libdecor_frame_unset_fullscreen(struct libdecor_frame *frame)
 {
 	xdg_toplevel_unset_fullscreen(frame->priv->xdg_toplevel);
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_is_floating(struct libdecor_frame *frame)
+{
+	return state_is_floating(frame->priv->window_state);
 }
 
 LIBDECOR_EXPORT void
