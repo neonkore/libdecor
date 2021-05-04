@@ -375,13 +375,8 @@ xdg_toplevel_configure(void *user_data,
 		frame_priv->pending_configuration->window_height =
 				frame->priv->floating_height;
 	} else {
-		if (!(window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
-		      window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN ||
-		      window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
-		      window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT ||
-		      window_state & LIBDECOR_WINDOW_STATE_TILED_TOP ||
-		      window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)) {
-			/* store state if not already maximized or tiled */
+		/* store current floating state */
+		if (state_is_floating(window_state)) {
 			frame->priv->floating_width = width;
 			frame->priv->floating_height = height;
 		}
@@ -974,9 +969,8 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 	frame_priv->content_width = state->content_width;
 	frame_priv->content_height = state->content_height;
 
-	/* do not set limits in maximized or fullscreen state */
-	if (!(state->window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
-	      state->window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)) {
+	/* do not set limits in non-floating states */
+	if (state_is_floating(state->window_state)) {
 		libdecor_frame_apply_limits(frame, state->window_state);
 	}
 }
