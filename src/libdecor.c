@@ -998,6 +998,14 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 		break;
 	}
 
+	/* set the floating dimensions via the application's requested content size */
+	if (configuration == NULL) {
+		plugin->iface->frame_get_window_size_for(
+					plugin, frame, state,
+					&frame->priv->floating_width,
+					&frame->priv->floating_height);
+	}
+
 	if (configuration) {
 		xdg_surface_ack_configure(frame_priv->xdg_surface,
 					  configuration->serial);
