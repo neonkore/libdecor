@@ -41,6 +41,7 @@
 #include "cursor-settings.h"
 
 #include <cairo/cairo.h>
+#include <pango/pangocairo.h>
 
 #include "libdecor-cairo-blur.h"
 
@@ -242,6 +243,8 @@ struct libdecor_frame_cairo {
 
 	/* store pre-processed shadow tile */
 	cairo_surface_t *shadow_blur;
+
+	PangoFontDescription *font;
 
 	struct wl_list link;
 };
@@ -457,6 +460,12 @@ libdecor_frame_cairo_new(struct libdecor_plugin_cairo *plugin_cairo)
 	cairo_fill(cr);
 	cairo_destroy(cr);
 	blur_surface(frame_cairo->shadow_blur, 64);
+
+	/* define a sens-serif bold font at symbol size */
+	frame_cairo->font = pango_font_description_new();
+	pango_font_description_set_family(frame_cairo->font, "sans");
+	pango_font_description_set_weight(frame_cairo->font, PANGO_WEIGHT_BOLD);
+	pango_font_description_set_size(frame_cairo->font, SYM_DIM * PANGO_SCALE);
 
 	return frame_cairo;
 }
@@ -703,6 +712,8 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 		cairo_surface_destroy(frame_cairo->shadow_blur);
 		frame_cairo->shadow_blur = NULL;
 	}
+
+	pango_font_description_free(frame_cairo->font);
 
 	frame_cairo->decoration_type = DECORATION_TYPE_NONE;
 
@@ -1100,6 +1111,63 @@ border_component_get_scale(struct border_component *border_component)
 }
 
 static void
+draw_title_text(struct libdecor_frame_cairo *frame_cairo, cairo_t *cr, const int *title_width)
+{
+	PangoLayout *layout;
+
+	/* title fade out at buttons */
+	const int fade_width = 5 * BUTTON_WIDTH;
+	int fade_start;
+	cairo_pattern_t *fade;
+
+	/* text position and dimensions */
+	int text_extents_width, text_extents_height;
+	double text_x, text_y;
+	double text_width, text_height;
+
+	layout = pango_cairo_create_layout(cr);
+
+	pango_layout_set_text(layout,
+			      libdecor_frame_get_title((struct libdecor_frame*) frame_cairo),
+			      -1);
+	pango_layout_set_font_description(layout, frame_cairo->font);
+	pango_layout_get_size(layout, &text_extents_width, &text_extents_height);
+
+	/* set text position and dimensions */
+	text_width = text_extents_width / PANGO_SCALE;
+	text_height = text_extents_height / PANGO_SCALE;
+	text_x = *title_width / 2.0 - text_width / 2.0;
+	text_x += MIN(0.0, ((*title_width - fade_width) - (text_x + text_width)));
+	text_x = MAX(text_x, BUTTON_WIDTH);
+	text_y = TITLE_HEIGHT / 2.0 - text_height / 2.0;
+
+	/* draw title text */
+	cairo_move_to(cr, text_x, text_y);
+	cairo_set_rgba32(cr, &COL_SYM);
+	pango_cairo_show_layout(cr, layout);
+
+	/* draw fade-out from title text to buttons */
+	fade_start = *title_width - fade_width;
+	fade = cairo_pattern_create_linear(fade_start, 0,
+					   fade_start + 2 * BUTTON_WIDTH, 0);
+	cairo_pattern_add_color_stop_rgba(fade, 0,
+					  red(&COL_TITLE),
+					  green(&COL_TITLE),
+					  blue(&COL_TITLE),
+					  0);
+	cairo_pattern_add_color_stop_rgb(fade, 1,
+					 red(&COL_TITLE),
+					 green(&COL_TITLE),
+					 blue(&COL_TITLE));
+	cairo_rectangle(cr, fade_start, 0, fade_width, TITLE_HEIGHT);
+	cairo_set_source(cr, fade);
+	cairo_fill(cr);
+
+	cairo_pattern_destroy(fade);
+	g_object_unref(layout);
+}
+
+static void
 draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 		       struct border_component *border_component,
 		       int component_width,
@@ -1117,15 +1185,6 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	const double y = TITLE_HEIGHT / 2 - SYM_DIM / 2 + 0.5;
 
 	enum libdecor_window_state state;
-
-	/* title fade out at buttons */
-	const int fade_width = 5 * BUTTON_WIDTH;
-	int fade_start;
-	const char *title_text;
-	cairo_text_extents_t text_extents;
-	double text_x;
-	double text_fade_overlap;
-	cairo_pattern_t *fade;
 
 	bool cap_min, cap_max, cap_close;
 
@@ -1213,38 +1272,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 
 	switch (component) {
 	case TITLE:
-		cairo_select_font_face(cr, "sans-serif",
-				       CAIRO_FONT_SLANT_NORMAL,
-				       CAIRO_FONT_WEIGHT_BOLD);
-		cairo_set_font_size(cr, SYM_DIM);
-		cairo_set_rgba32(cr, &COL_SYM);
-		title_text = libdecor_frame_get_title(
-			(struct libdecor_frame*) frame_cairo);
-		cairo_text_extents (cr, title_text, &text_extents);
-		text_x = component_width / 2.0 - text_extents.width / 2;
-		text_fade_overlap = ((component_width - fade_width) -
-				     (text_x + text_extents.width));
-		text_x += MIN (0.0, text_fade_overlap);
-		text_x = MAX (text_x, BUTTON_WIDTH);
-		cairo_move_to(cr, text_x, y + SYM_DIM - 1);
-		cairo_show_text(cr, title_text);
-		fade_start = libdecor_frame_get_content_width(
-				(struct libdecor_frame *)frame_cairo)-fade_width;
-		fade = cairo_pattern_create_linear(
-			       fade_start, 0, fade_start + 2 * BUTTON_WIDTH, 0);
-		cairo_pattern_add_color_stop_rgba(fade, 0,
-						  red(&COL_TITLE),
-						  green(&COL_TITLE),
-						  blue(&COL_TITLE),
-						  0);
-		cairo_pattern_add_color_stop_rgb(fade, 1,
-						 red(&COL_TITLE),
-						 green(&COL_TITLE),
-						 blue(&COL_TITLE));
-		cairo_rectangle(cr, fade_start, 0, fade_width, TITLE_HEIGHT);
-		cairo_set_source(cr, fade);
-		cairo_fill(cr);
-		cairo_pattern_destroy(fade);
+		draw_title_text(frame_cairo,cr, &component_width);
 		break;
 	case BUTTON_MIN:
 		if (!cap_min || frame_cairo->active == &frame_cairo->title_bar.min)

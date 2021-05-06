@@ -1,4 +1,5 @@
 cairo_dep = dependency('cairo')
+pangocairo_dep = dependency('pangocairo')
 wayland_cursor_dep = dependency('wayland-cursor')
 math_dep = cc.find_library('m', required: true)
 
@@ -15,6 +16,7 @@ shared_module('decor-cairo',
   dependencies: [
     libdecor_dep,
     cairo_dep,
+    pangocairo_dep,
     math_dep,
     wayland_cursor_dep,
     cursor_settings_dep,
