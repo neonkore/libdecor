@@ -14,6 +14,7 @@ Required:
 - `wayland-protocols` >= 1.15
 - `wayland-cursor`
 - `cairo`
+- `pangocairo`
 
 Recommended:
 - `dbus-1` (to query current cursor theme)
@@ -23,10 +24,10 @@ Optional
 - `xkbcommon` (to build cairo demo)
 
 Install via apt:
-`sudo apt install meson libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev libegl-dev libxkbcommon-dev`
+`sudo apt install meson libwayland-dev wayland-protocols libpango1.0-dev libdbus-1-dev libegl-dev libxkbcommon-dev`
 
 Install via dnf:
-`sudo dnf install meson wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel libxkbcommon-devel`
+`sudo dnf install meson wayland-devel wayland-protocols-devel pango-devel dbus-devel mesa-libEGL-devel libxkbcommon-devel`
 
 Newer meson versions can be installed via pip: `pip3 install -U meson`.
 
