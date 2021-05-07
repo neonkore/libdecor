@@ -27,6 +27,7 @@ Install via apt:
 Install via dnf:
 `sudo dnf install meson wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel`
 
+Newer meson versions can be installed via pip: `pip3 install -U meson`.
 
 ## Build & Install
 
