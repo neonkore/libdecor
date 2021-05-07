@@ -22,10 +22,10 @@ Optional
 - `egl` (to build EGL example)
 
 Install via apt:
-`sudo apt install meson ninja-build libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev libegl-dev`
+`sudo apt install meson libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev libegl-dev`
 
 Install via dnf:
-`sudo dnf install meson ninja-build wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel`
+`sudo dnf install meson wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel`
 
 
 ## Build & Install
