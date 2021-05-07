@@ -20,12 +20,13 @@ Recommended:
 
 Optional
 - `egl` (to build EGL example)
+- `xkbcommon` (to build cairo demo)
 
 Install via apt:
-`sudo apt install meson libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev libegl-dev`
+`sudo apt install meson libwayland-dev wayland-protocols libcairo2-dev libdbus-1-dev libegl-dev libxkbcommon-dev`
 
 Install via dnf:
-`sudo dnf install meson wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel`
+`sudo dnf install meson wayland-devel wayland-protocols-devel dbus-devel cairo-devel mesa-libEGL-devel libxkbcommon-devel`
 
 Newer meson versions can be installed via pip: `pip3 install -U meson`.
 
