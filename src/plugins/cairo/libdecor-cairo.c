@@ -2459,15 +2459,11 @@ init_wl_seat(struct libdecor_plugin_cairo *plugin_cairo,
 	struct seat *seat;
 
 	if (version < 3) {
-		char *err_msg;
-		asprintf(&err_msg,
-			 "%s version 3 required but only version %i is available\n",
-			 wl_seat_interface.name, version);
 		libdecor_notify_plugin_error(
 				plugin_cairo->context,
 				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-				err_msg);
-		free(err_msg);
+				"%s version 3 required but only version %i is available\n",
+				wl_seat_interface.name, version);
 	}
 
 	seat = zalloc(sizeof *seat);
@@ -2552,15 +2548,11 @@ init_wl_output(struct libdecor_plugin_cairo *plugin_cairo,
 	struct output *output;
 
 	if (version < 2) {
-		char *err_msg;
-		asprintf(&err_msg,
-			 "%s version 2 required but only version %i is available\n",
-			 wl_output_interface.name, version);
 		libdecor_notify_plugin_error(
 				plugin_cairo->context,
 				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-				err_msg);
-		free(err_msg);
+				"%s version 2 required but only version %i is available\n",
+				wl_output_interface.name, version);
 	}
 
 	output = zalloc(sizeof *output);
@@ -2683,10 +2675,8 @@ globals_callback(void *user_data,
 	plugin_cairo->globals_callback = NULL;
 
 	if (!has_required_globals(plugin_cairo)) {
-		struct libdecor *context = plugin_cairo->context;
-
 		libdecor_notify_plugin_error(
-				context,
+				plugin_cairo->context,
 				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
 				"Compositor is missing required globals");
 	}
