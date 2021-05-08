@@ -894,18 +894,14 @@ libdecor_frame_apply_limits(struct libdecor_frame *frame,
 	struct libdecor_plugin *plugin = frame_priv->context->plugin;
 
 	if (!valid_limits(frame_priv)) {
-		char *err_msg;
-		asprintf(&err_msg,
-			 "minimum size (%i,%i) must be smaller than maximum size (%i,%i)",
-			 frame_priv->state.content_limits.min_width,
-			 frame_priv->state.content_limits.min_height,
-			 frame_priv->state.content_limits.max_width,
-			 frame_priv->state.content_limits.max_height);
 		libdecor_notify_plugin_error(
 			frame_priv->context,
 			LIBDECOR_ERROR_INVALID_FRAME_CONFIGURATION,
-			err_msg);
-		free(err_msg);
+			"minimum size (%i,%i) must be smaller than maximum size (%i,%i)",
+			frame_priv->state.content_limits.min_width,
+			frame_priv->state.content_limits.min_height,
+			frame_priv->state.content_limits.max_width,
+			frame_priv->state.content_limits.max_height);
 	}
 
 	/* If the frame is configured as non-resizable before the first
@@ -1442,12 +1438,25 @@ libdecor_notify_plugin_ready(struct libdecor *context)
 LIBDECOR_EXPORT void
 libdecor_notify_plugin_error(struct libdecor *context,
 			     enum libdecor_error error,
-			     const char *message)
+			     const char *__restrict fmt,
+			     ...)
 {
+	char *msg = NULL;
+	int nbytes = 0;
+	va_list argp;
+
 	if (context->has_error)
 		return;
 
-	notify_error(context, error, message);
+	va_start(argp, fmt);
+	nbytes = vasprintf(&msg, fmt, argp);
+	va_end(argp);
+
+	if (nbytes>0)
+		notify_error(context, error, msg);
+
+	if (msg)
+		free(msg);
 }
 
 LIBDECOR_EXPORT void

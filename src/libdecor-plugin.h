@@ -161,7 +161,8 @@ libdecor_notify_plugin_ready(struct libdecor *context);
 void
 libdecor_notify_plugin_error(struct libdecor *context,
 			     enum libdecor_error error,
-			     const char *message);
+			     const char *__restrict fmt,
+			     ...);
 
 int
 libdecor_state_get_content_width (struct libdecor_state *state);
