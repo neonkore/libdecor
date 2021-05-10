@@ -713,6 +713,8 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 		frame_cairo->shadow_blur = NULL;
 	}
 
+	free(frame_cairo->title);
+
 	pango_font_description_free(frame_cairo->font);
 
 	frame_cairo->decoration_type = DECORATION_TYPE_NONE;
