@@ -701,6 +701,14 @@ keyboard_key(void *data,
 			libdecor_frame_set_title(window->frame, titles[window->title_index]);
 			window->title_index = (window->title_index + 1) % N_TITLES;
 			break;
+		case XKB_KEY_h: /* toggle decorations */
+			libdecor_frame_set_visibility(
+					window->frame,
+					!libdecor_frame_is_visible(window->frame));
+			printf("decorations %s\n",
+			       libdecor_frame_is_visible(window->frame) ?
+				       "visible" : "hidden");
+			break;
 		}
 	}
 }
