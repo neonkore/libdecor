@@ -55,6 +55,21 @@ static const int POPUP_HEIGHT = 300;
 
 static const char *proxy_tag = "libdecor-demo";
 
+static const char *titles[] = {
+	"Hello!",
+	"Hallå!",
+	"Привет!",
+	"Γειά σου!",
+	"שלום!",
+	"你好！",
+	"สวัสดี!",
+	"こんにちは！",
+	"👻❤️🤖➕🍰",
+};
+
+static const size_t N_TITLES = ARRAY_SIZE(titles);
+
+
 static bool
 own_proxy(struct wl_proxy *proxy)
 {
@@ -94,6 +109,7 @@ struct window {
 	struct wl_list outputs;
 	int scale;
 	struct popup *popup;
+	size_t title_index;
 };
 
 struct seat {
@@ -681,6 +697,10 @@ keyboard_key(void *data,
 			printf("set XVGA resolution: 1024x768\n");
 			resize(window, 1024, 768);
 			break;
+		case XKB_KEY_t:
+			libdecor_frame_set_title(window->frame, titles[window->title_index]);
+			window->title_index = (window->title_index + 1) % N_TITLES;
+			break;
 		}
 	}
 }
@@ -1241,6 +1261,7 @@ main(int argc,
 
 	window = zalloc(sizeof *window);
 	window->scale = 1;
+	window->title_index = 0;
 	wl_list_for_each(output, &outputs, link) {
 		window->scale = MAX(window->scale, output->scale);
 	}
