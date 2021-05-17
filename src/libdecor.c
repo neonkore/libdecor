@@ -1379,7 +1379,7 @@ retry_next:
 	plugin = plugin_loader->description->constructor(context);
 	if (!plugin) {
 		fprintf(stderr,
-			"Failed to load plugin '%s': failod to init\n",
+			"Failed to load plugin '%s': failed to init\n",
 			plugin_loader->name);
 		dlclose(plugin_loader->lib);
 		wl_list_remove(&plugin_loader->link);
