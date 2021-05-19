@@ -152,6 +152,24 @@ state_is_floating(enum libdecor_window_state window_state)
 	return !(window_state & states_non_floating);
 }
 
+static void
+constrain_content_size(const struct libdecor_frame *frame,
+		       int *width,
+		       int *height)
+{
+	const struct libdecor_limits lim = frame->priv->state.content_limits;
+
+	if (lim.min_width > 0)
+		*width = MAX(lim.min_width, *width);
+	if (lim.max_width > 0)
+		*width = MIN(*width, lim.max_width);
+
+	if (lim.min_height > 0)
+		*height = MAX(lim.min_height, *height);
+	if (lim.max_height > 0)
+		*height = MIN(*height, lim.max_height);
+}
+
 static bool
 frame_has_visible_client_side_decoration(struct libdecor_frame *frame)
 {
@@ -261,6 +279,11 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 
 	*width = content_width;
 	*height = content_height;
+
+	if (libdecor_frame_is_floating(frame)) {
+		constrain_content_size(frame, width, height);
+	}
+
 	return true;
 }
 
