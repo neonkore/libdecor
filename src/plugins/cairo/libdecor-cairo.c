@@ -715,6 +715,7 @@ libdecor_plugin_cairo_frame_free(struct libdecor_plugin *plugin,
 	}
 
 	free(frame_cairo->title);
+	frame_cairo->title = NULL;
 
 	frame_cairo->decoration_type = DECORATION_TYPE_NONE;
 
@@ -1769,11 +1770,15 @@ libdecor_plugin_cairo_frame_property_changed(struct libdecor_plugin *plugin,
 		if (!streql(frame_cairo->title, new_title))
 			redraw_needed = true;
 	}
-	free(frame_cairo->title);
-	if (new_title)
-		frame_cairo->title = strdup(new_title);
-	else
+
+	if (frame_cairo->title) {
+		free(frame_cairo->title);
 		frame_cairo->title = NULL;
+	}
+
+	if (new_title) {
+		frame_cairo->title = strdup(new_title);
+	}
 
 	if (frame_cairo->capabilities != libdecor_frame_get_capabilities(frame)) {
 		frame_cairo->capabilities = libdecor_frame_get_capabilities(frame);
