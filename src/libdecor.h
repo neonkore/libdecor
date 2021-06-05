@@ -215,7 +215,7 @@ libdecor_dispatch(struct libdecor *context,
  */
 struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,
-		  struct wl_surface *surface,
+		  struct wl_surface *wl_surface,
 		  struct libdecor_frame_interface *iface,
 		  void *user_data);
 

@@ -515,15 +515,13 @@ init_shell_surface(struct libdecor_frame *frame)
 		do_map(frame);
 }
 
-LIBDECOR_EXPORT struct libdecor_frame *
-libdecor_decorate(struct libdecor *context,
+static struct libdecor_frame *
+decorate(struct libdecor *context,
 		  struct wl_surface *wl_surface,
-		  struct libdecor_frame_interface *iface,
 		  void *user_data)
 {
 	struct libdecor_plugin *plugin = context->plugin;
 	struct libdecor_frame *frame;
-	struct libdecor_frame_private *frame_priv;
 
 	if (context->has_error)
 		return NULL;
@@ -532,15 +530,13 @@ libdecor_decorate(struct libdecor *context,
 	if (!frame)
 		return NULL;
 
-	frame_priv = zalloc(sizeof *frame_priv);
-	frame->priv = frame_priv;
+	frame->priv = zalloc(sizeof (struct libdecor_frame_private));
 
-	frame_priv->ref_count = 1;
-	frame_priv->context = context;
+	frame->priv->ref_count = 1;
+	frame->priv->context = context;
 
-	frame_priv->wl_surface = wl_surface;
-	frame_priv->iface = iface;
-	frame_priv->user_data = user_data;
+	frame->priv->wl_surface = wl_surface;
+	frame->priv->user_data = user_data;
 
 	wl_list_insert(&context->frames, &frame->link);
 
@@ -551,7 +547,21 @@ libdecor_decorate(struct libdecor *context,
 					LIBDECOR_ACTION_FULLSCREEN |
 					LIBDECOR_ACTION_CLOSE);
 
-	frame_priv->visible = true;
+	frame->priv->visible = true;
+
+	return frame;
+}
+
+LIBDECOR_EXPORT struct libdecor_frame *
+libdecor_decorate(struct libdecor *context,
+		  struct wl_surface *wl_surface,
+		  struct libdecor_frame_interface *iface,
+		  void *user_data)
+{
+	struct libdecor_frame *frame;
+
+	frame = decorate(context, wl_surface, user_data);
+	frame->priv->iface = iface;
 
 	if (context->init_done)
 		init_shell_surface(frame);
