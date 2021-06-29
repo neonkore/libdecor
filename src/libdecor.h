@@ -230,9 +230,6 @@ libdecor_frame_move(struct libdecor_frame *frame,
 		    uint32_t serial);
 
 void
-libdecor_frame_toplevel_commit(struct libdecor_frame *frame);
-
-void
 libdecor_frame_commit(struct libdecor_frame *frame,
 		      struct libdecor_state *state,
 		      struct libdecor_configuration *configuration);
@@ -281,11 +278,6 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 					struct libdecor_frame *frame,
 					int *width,
 					int *height);
-
-bool
-libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
-				       int *width,
-				       int *height);
 
 bool
 libdecor_configuration_get_window_state(struct libdecor_configuration *configuration,

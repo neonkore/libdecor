@@ -152,6 +152,9 @@ void
 libdecor_frame_dismiss_popup(struct libdecor_frame *frame,
 			     const char *seat_name);
 
+void
+libdecor_frame_toplevel_commit(struct libdecor_frame *frame);
+
 struct wl_display *
 libdecor_get_wl_display(struct libdecor *context);
 
@@ -172,5 +175,10 @@ libdecor_state_get_content_height (struct libdecor_state *state);
 
 enum libdecor_window_state
 libdecor_state_get_window_state(struct libdecor_state *state);
+
+bool
+libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
+				       int *width,
+				       int *height);
 
 #endif /* LIBDECOR_PLUGIN_H */
