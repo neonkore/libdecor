@@ -280,7 +280,7 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 	*width = content_width;
 	*height = content_height;
 
-	if (libdecor_frame_is_floating(frame)) {
+	if (state_is_floating(configuration->window_state)) {
 		constrain_content_size(frame, width, height);
 	}
 
