@@ -236,6 +236,27 @@ libdecor_configuration_free(struct libdecor_configuration *configuration)
 }
 
 static bool
+frame_get_window_size_for(struct libdecor_frame *frame,
+			  struct libdecor_state *state,
+			  int *window_width,
+			  int *window_height)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+	struct libdecor *context = frame_priv->context;
+	struct libdecor_plugin *plugin = context->plugin;
+
+	if (frame_has_visible_client_side_decoration(frame)) {
+		return plugin->iface->frame_get_window_size_for(
+					plugin, frame, state,
+					window_width, window_height);
+	} else {
+		*window_width = state->content_width;
+		*window_height = state->content_height;
+		return true;
+	}
+}
+
+static bool
 window_size_to_content_size(struct libdecor_configuration *configuration,
 			    struct libdecor_frame *frame,
 			    int *content_width,
@@ -987,7 +1008,6 @@ libdecor_frame_apply_limits(struct libdecor_frame *frame,
 			    enum libdecor_window_state window_state)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
-	struct libdecor_plugin *plugin = frame_priv->context->plugin;
 
 	if (!valid_limits(frame_priv)) {
 		libdecor_notify_plugin_error(
@@ -1024,8 +1044,8 @@ libdecor_frame_apply_limits(struct libdecor_frame *frame,
 		state_min.content_height = frame_priv->state.content_limits.min_height;
 		state_min.window_state = window_state;
 
-		plugin->iface->frame_get_window_size_for(
-					plugin, frame, &state_min,
+		frame_get_window_size_for(
+					frame, &state_min,
 					&win_min_width, &win_min_height);
 		xdg_toplevel_set_min_size(frame_priv->xdg_toplevel,
 					  win_min_width, win_min_height);
@@ -1042,8 +1062,8 @@ libdecor_frame_apply_limits(struct libdecor_frame *frame,
 		state_max.content_height = frame_priv->state.content_limits.max_height;
 		state_max.window_state = window_state;
 
-		plugin->iface->frame_get_window_size_for(
-					plugin, frame, &state_max,
+		frame_get_window_size_for(
+					frame, &state_max,
 					&win_max_width, &win_max_height);
 		xdg_toplevel_set_max_size(frame_priv->xdg_toplevel,
 					  win_max_width, win_max_height);
@@ -1106,8 +1126,8 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 
 	/* set the floating dimensions via the application's requested content size */
 	if (configuration == NULL) {
-		plugin->iface->frame_get_window_size_for(
-					plugin, frame, state,
+		frame_get_window_size_for(
+					frame, state,
 					&frame->priv->floating_width,
 					&frame->priv->floating_height);
 	}
