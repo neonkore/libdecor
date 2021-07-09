@@ -44,7 +44,7 @@
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
 
-#include "libdecor-cairo-blur.h"
+#include "common/libdecor-cairo-blur.h"
 
 static const size_t SHADOW_MARGIN = 24;	/* graspable part of the border */
 static const size_t TITLE_HEIGHT = 24;
