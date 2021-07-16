@@ -1,3 +1,5 @@
+add_languages('cpp')
+
 wayland_cursor_dep = dependency('wayland-cursor')
 
 math_dep = cc.find_library('m')
@@ -57,5 +59,25 @@ executable('libdecor-egl',
     egl_dep,
     gl_dep,
     math_dep],
+  install: false,
+)
+
+executable('libdecor-c++-demo',
+  sources: [
+    'c++-demo.cc',
+  ],
+  cpp_args: [
+    '-Wno-unused-parameter',
+    '-Wno-missing-field-initializers',
+  ],
+  include_directories: [
+    top_includepath,
+    libdecor_includepath,
+  ],
+  dependencies: [
+    libdecor_dep,
+    wayland_cursor_dep,
+    cursor_settings_dep,
+    xkb_dep],
   install: false,
 )
