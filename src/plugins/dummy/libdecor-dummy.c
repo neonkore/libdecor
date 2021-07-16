@@ -171,6 +171,7 @@ static struct libdecor_plugin_priority priorities[] = {
 LIBDECOR_EXPORT const struct libdecor_plugin_description
 libdecor_plugin_description = {
 	.api_version = LIBDECOR_PLUGIN_API_VERSION,
+	.capabilities = LIBDECOR_PLUGIN_CAPABILITY_BASE,
 	.description = "dummy libdecor plugin",
 	.priorities = priorities,
 	.constructor = libdecor_plugin_new,

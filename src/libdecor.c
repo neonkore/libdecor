@@ -1435,6 +1435,11 @@ load_plugin_loader(struct libdecor *context,
 		return NULL;
 	}
 
+	if (!(plugin_description->capabilities & LIBDECOR_PLUGIN_CAPABILITY_BASE)) {
+		dlclose(lib);
+		return NULL;
+	}
+
 	priority = calculate_priority(plugin_description);
 	if (priority == -1) {
 		dlclose(lib);

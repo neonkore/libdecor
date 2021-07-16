@@ -53,12 +53,20 @@ struct libdecor_plugin_priority {
 	int priority;
 };
 
+enum libdecor_plugin_capabilities {
+	LIBDECOR_PLUGIN_CAPABILITY_BASE = 1 << 0,
+};
+
 struct libdecor_plugin_description {
 	/* API version the plugin is compatible with. */
 	int api_version;
 
 	/* Human readable string describing the plugin. */
 	char *description;
+
+	/* A plugin has a bitmask of capabilities. The plugin loader can use this
+	 * to load a plugin with the right capabilities. */
+	enum libdecor_plugin_capabilities capabilities;
 
 	/*
 	 * The priorities field points to a list of per desktop priorities.
