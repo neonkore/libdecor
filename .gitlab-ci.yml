@@ -1,7 +1,25 @@
-image: registry.gitlab.gnome.org/gnome/mutter/master:v4
+include:
+  - remote: 'https://gitlab.freedesktop.org/freedesktop/ci-templates/-/raw/3d03cccd770c04e63b40325b42223495274d6a1d/templates/fedora.yml'
 
 stages:
+ - prepare
  - build
+
+.libdecor.fedora:34@common:
+  variables:
+    FDO_DISTRIBUTION_VERSION: 34
+    BASE_TAG: '2021-07-16.1'
+    FDO_UPSTREAM_REPO: jadahl/libdecor
+    FDO_DISTRIBUTION_PACKAGES: |
+      pkgconfig(wayland-client) pkgconfig(dbus-1) pkgconfig(wayland-protocols)
+      pkgconfig(cairo) pkgconfig(pangocairo)
+      pkgconfig(wayland-cursor) pkgconfig(xkbcommon)
+      pkgconfig(egl) pkgconfig(gl) pkgconfig(wayland-egl)
+      meson
+    FDO_DISTRIBUTION_EXEC: |
+      dnf group install -y 'Development Tools' \
+                           'C Development Tools and Libraries' &&
+      dnf clean all
 
 default:
   # Cancel jobs if newer commits are pushed to the branch
@@ -28,10 +46,32 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - when: 'manual'
 
-build-libdecor:
+.libdecor.fedora:34@x86_64:
+  extends: .libdecor.fedora:34@common
+  variables:
+    FDO_DISTRIBUTION_TAG: "x86_64-${BASE_TAG}"
+
+build-fedora-container@x86_64:
+  extends:
+    - .fdo.container-build@fedora@x86_64
+    - .libdecor.fedora:34@x86_64
+  stage: prepare
+  variables:
+    GIT_STRATEGY: none
+  <<: *pipeline-guard
+
+.build-libdecor:
+  extends:
+    - .fdo.distribution-image@fedora
   stage: build
   script:
     - meson . build -Dbuildtype=debugoptimized -Dwarning_level=2 --werror --prefix /usr
     - ninja -C build
     - ninja -C build install
-  <<: *pipeline-guard
+
+build-libdecor@x86_64:
+  extends:
+    - .build-libdecor
+    - .libdecor.fedora:34@x86_64
+  needs:
+    - build-fedora-container@x86_64
