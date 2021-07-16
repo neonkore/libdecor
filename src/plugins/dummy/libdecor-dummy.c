@@ -46,6 +46,7 @@ libdecor_plugin_dummy_destroy(struct libdecor_plugin *plugin)
 	struct libdecor_plugin_dummy *plugin_dummy =
 		(struct libdecor_plugin_dummy *) plugin;
 
+	libdecor_plugin_release(plugin);
 	free(plugin_dummy);
 }
 
@@ -155,7 +156,7 @@ libdecor_plugin_new(struct libdecor *context)
 	struct libdecor_plugin_dummy *plugin_dummy;
 
 	plugin_dummy = zalloc(sizeof *plugin_dummy);
-	plugin_dummy->plugin.iface = &dummy_plugin_iface;
+	libdecor_plugin_init(&plugin_dummy->plugin, context, &dummy_plugin_iface);
 	plugin_dummy->context = context;
 
 	libdecor_notify_plugin_ready(context);

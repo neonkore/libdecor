@@ -130,6 +130,10 @@ struct libdecor_frame_private {
 	bool visible;
 };
 
+struct libdecor_plugin_private {
+	struct libdecor_plugin_interface *iface;
+};
+
 /* gather all states at which a window is non-floating */
 static const enum libdecor_window_state states_non_floating =
 	LIBDECOR_WINDOW_STATE_MAXIMIZED | LIBDECOR_WINDOW_STATE_FULLSCREEN |
@@ -246,7 +250,7 @@ frame_get_window_size_for(struct libdecor_frame *frame,
 	struct libdecor_plugin *plugin = context->plugin;
 
 	if (frame_has_visible_client_side_decoration(frame)) {
-		return plugin->iface->frame_get_window_size_for(
+		return plugin->priv->iface->frame_get_window_size_for(
 					plugin, frame, state,
 					window_width, window_height);
 	} else {
@@ -267,7 +271,7 @@ window_size_to_content_size(struct libdecor_configuration *configuration,
 	struct libdecor_plugin *plugin = context->plugin;
 
 	if (frame_has_visible_client_side_decoration(frame)) {
-		return plugin->iface->configuration_get_content_size(
+		return plugin->priv->iface->configuration_get_content_size(
 					plugin, configuration, frame,
 					content_width, content_height);
 	} else {
@@ -547,7 +551,7 @@ libdecor_decorate(struct libdecor *context,
 	if (context->has_error)
 		return NULL;
 
-	frame = plugin->iface->frame_new(plugin);
+	frame = plugin->priv->iface->frame_new(plugin);
 	if (!frame)
 		return NULL;
 
@@ -601,7 +605,7 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 		if (frame_priv->xdg_surface)
 			xdg_surface_destroy(frame_priv->xdg_surface);
 
-		plugin->iface->frame_free(plugin, frame);
+		plugin->priv->iface->frame_free(plugin, frame);
 
 		free(frame_priv->state.title);
 		free(frame_priv->state.app_id);
@@ -645,10 +649,10 @@ libdecor_frame_set_visibility(struct libdecor_frame *frame,
 	/* enable/disable decorations that are managed by a plugin */
 	if (frame_has_visible_client_side_decoration(frame)) {
 		/* show client-side decorations */
-		plugin->iface->frame_commit(plugin, frame, NULL, NULL);
+		plugin->priv->iface->frame_commit(plugin, frame, NULL, NULL);
 	} else {
 		/* destroy client-side decorations */
-		plugin->iface->frame_free(plugin, frame);
+		plugin->priv->iface->frame_free(plugin, frame);
 
 		libdecor_frame_set_window_geometry(frame, 0, 0,
 						   frame_priv->content_width,
@@ -695,7 +699,7 @@ libdecor_frame_set_title(struct libdecor_frame *frame,
 
 		xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
 	
-		plugin->iface->frame_property_changed(plugin, frame);
+		plugin->priv->iface->frame_property_changed(plugin, frame);
 	}
 }
 
@@ -734,7 +738,7 @@ notify_on_capability_change(struct libdecor_frame *frame,
 	    frame->priv->content_height == 0)
 		return;
 
-	plugin->iface->frame_property_changed(plugin, frame);
+	plugin->priv->iface->frame_property_changed(plugin, frame);
 
 	if (!libdecor_frame_has_capability(frame, LIBDECOR_ACTION_RESIZE)) {
 		frame->priv->interactive_limits = frame->priv->state.content_limits;
@@ -797,7 +801,7 @@ libdecor_frame_popup_grab(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	plugin->iface->frame_popup_grab(plugin, frame, seat_name);
+	plugin->priv->iface->frame_popup_grab(plugin, frame, seat_name);
 }
 
 LIBDECOR_EXPORT void
@@ -808,7 +812,7 @@ libdecor_frame_popup_ungrab(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	plugin->iface->frame_popup_ungrab(plugin, frame, seat_name);
+	plugin->priv->iface->frame_popup_ungrab(plugin, frame, seat_name);
 }
 
 LIBDECOR_EXPORT void
@@ -850,9 +854,9 @@ libdecor_frame_translate_coordinate(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	plugin->iface->frame_translate_coordinate(plugin, frame,
-						  content_x, content_y,
-						  frame_x, frame_y);
+	plugin->priv->iface->frame_translate_coordinate(plugin, frame,
+							content_x, content_y,
+							frame_x, frame_y);
 }
 
 LIBDECOR_EXPORT void
@@ -1115,9 +1119,10 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 
 	/* switch between decoration modes */
 	if (frame_has_visible_client_side_decoration(frame)) {
-		plugin->iface->frame_commit(plugin, frame, state, configuration);
+		plugin->priv->iface->frame_commit(plugin, frame, state,
+						  configuration);
 	} else {
-		plugin->iface->frame_free(plugin, frame);
+		plugin->priv->iface->frame_free(plugin, frame);
 
 		libdecor_frame_set_window_geometry(frame, 0, 0,
 						   frame_priv->content_width,
@@ -1206,6 +1211,25 @@ libdecor_frame_get_window_state(struct libdecor_frame *frame)
 	return frame_priv->window_state;
 }
 
+LIBDECOR_EXPORT int
+libdecor_plugin_init(struct libdecor_plugin *plugin,
+		     struct libdecor *context,
+		     struct libdecor_plugin_interface *iface)
+{
+	plugin->priv = zalloc(sizeof (struct libdecor_plugin_private));
+	if (!plugin->priv)
+		return -1;
+
+	plugin->priv->iface = iface;
+
+	return 0;
+}
+
+LIBDECOR_EXPORT void
+libdecor_plugin_release(struct libdecor_plugin *plugin)
+{
+}
+
 static void
 xdg_wm_base_ping(void *user_data,
 		 struct xdg_wm_base *xdg_wm_base,
@@ -1279,7 +1303,7 @@ notify_error(struct libdecor *context,
 {
 	context->has_error = true;
 	context->iface->error(context, error, message);
-	context->plugin->iface->destroy(context->plugin);
+	context->plugin->priv->iface->destroy(context->plugin);
 }
 
 static void
@@ -1528,7 +1552,7 @@ libdecor_get_fd(struct libdecor *context)
 {
 	struct libdecor_plugin *plugin = context->plugin;
 
-	return plugin->iface->get_fd(plugin);
+	return plugin->priv->iface->get_fd(plugin);
 }
 
 LIBDECOR_EXPORT int
@@ -1537,7 +1561,7 @@ libdecor_dispatch(struct libdecor *context,
 {
 	struct libdecor_plugin *plugin = context->plugin;
 
-	return plugin->iface->dispatch(plugin, timeout);
+	return plugin->priv->iface->dispatch(plugin, timeout);
 }
 
 LIBDECOR_EXPORT struct wl_display *
@@ -1585,7 +1609,7 @@ libdecor_unref(struct libdecor *context)
 	context->ref_count--;
 	if (context->ref_count == 0) {
 		if (context->plugin)
-			context->plugin->iface->destroy(context->plugin);
+			context->plugin->priv->iface->destroy(context->plugin);
 		if (context->init_callback)
 			wl_callback_destroy(context->init_callback);
 		wl_registry_destroy(context->wl_registry);

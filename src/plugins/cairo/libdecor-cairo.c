@@ -402,6 +402,7 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 	wl_compositor_destroy(plugin_cairo->wl_compositor);
 	wl_subcompositor_destroy(plugin_cairo->wl_subcompositor);
 
+	libdecor_plugin_release(&plugin_cairo->plugin);
 	free(plugin_cairo);
 }
 
@@ -2772,7 +2773,9 @@ libdecor_plugin_new(struct libdecor *context)
 	struct wl_display *wl_display;
 
 	plugin_cairo = zalloc(sizeof *plugin_cairo);
-	plugin_cairo->plugin.iface = &cairo_plugin_iface;
+	libdecor_plugin_init(&plugin_cairo->plugin,
+			     context,
+			     &cairo_plugin_iface);
 	plugin_cairo->context = context;
 
 	wl_list_init(&plugin_cairo->visible_frame_list);

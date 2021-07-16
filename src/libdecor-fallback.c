@@ -40,6 +40,7 @@ struct libdecor_plugin_fallback {
 static void
 libdecor_plugin_fallback_destroy(struct libdecor_plugin *plugin)
 {
+	libdecor_plugin_release(plugin);
 	free(plugin);
 }
 
@@ -199,7 +200,7 @@ libdecor_fallback_plugin_new(struct libdecor *context)
 	struct libdecor_plugin_fallback *plugin;
 
 	plugin = zalloc(sizeof *plugin);
-	plugin->plugin.iface = &fallback_plugin_iface;
+	libdecor_plugin_init(&plugin->plugin, context, &fallback_plugin_iface);
 	plugin->context = context;
 
 	libdecor_notify_plugin_ready(context);

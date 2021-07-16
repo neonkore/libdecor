@@ -39,8 +39,7 @@ struct libdecor_frame {
 struct libdecor_plugin_private;
 
 struct libdecor_plugin {
-	struct libdecor_plugin_interface *iface;
-	struct libdecor_plugin_private *private;
+	struct libdecor_plugin_private *priv;
 };
 
 typedef struct libdecor_plugin * (* libdecor_plugin_constructor)(struct libdecor *context);
@@ -180,5 +179,13 @@ bool
 libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
 				       int *width,
 				       int *height);
+
+int
+libdecor_plugin_init(struct libdecor_plugin *plugin,
+		     struct libdecor *context,
+		     struct libdecor_plugin_interface *iface);
+
+void
+libdecor_plugin_release(struct libdecor_plugin *plugin);
 
 #endif /* LIBDECOR_PLUGIN_H */
