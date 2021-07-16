@@ -3,12 +3,35 @@ image: registry.gitlab.gnome.org/gnome/mutter/master:v4
 stages:
  - build
 
+default:
+  # Cancel jobs if newer commits are pushed to the branch
+  interruptible: true
+  # Auto-retry jobs in case of infra failures
+  retry:
+    max: 1
+    when:
+      - 'runner_system_failure'
+      - 'stuck_or_timeout_failure'
+      - 'scheduler_failure'
+      - 'api_failure'
+
+workflow:
+  rules:
+    - if: '$CI_MERGE_REQUEST_IID'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH'
+
+.pipeline-guard: &pipeline-guard
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: 'manual'
+
 build-libdecor:
   stage: build
   script:
     - meson . build -Dbuildtype=debugoptimized -Dwarning_level=2 --werror --prefix /usr
     - ninja -C build
     - ninja -C build install
-  only:
-    - merge_requests
-    - /^.*$/
+  <<: *pipeline-guard
