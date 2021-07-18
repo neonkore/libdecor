@@ -235,7 +235,7 @@ libdecor_frame_unref(struct libdecor_frame *frame);
 /**
  * Set the visibility of the frame.
  *
- * If an application wants to be bordeless, it can set the frame visibilyt to
+ * If an application wants to be borderless, it can set the frame visibility to
  * false.
  */
 void
