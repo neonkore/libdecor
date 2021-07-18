@@ -8,13 +8,14 @@ stages:
 .libdecor.fedora:34@common:
   variables:
     FDO_DISTRIBUTION_VERSION: 34
-    BASE_TAG: '2021-07-16.1'
+    BASE_TAG: '2021-07-18.1'
     FDO_UPSTREAM_REPO: jadahl/libdecor
     FDO_DISTRIBUTION_PACKAGES: |
       pkgconfig(wayland-client) pkgconfig(dbus-1) pkgconfig(wayland-protocols)
       pkgconfig(cairo) pkgconfig(pangocairo)
       pkgconfig(wayland-cursor) pkgconfig(xkbcommon)
       pkgconfig(egl) pkgconfig(gl) pkgconfig(wayland-egl)
+      pkgconfig(gtk+-3.0)
       meson
     FDO_DISTRIBUTION_EXEC: |
       dnf group install -y 'Development Tools' \
