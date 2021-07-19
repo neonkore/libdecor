@@ -94,8 +94,10 @@ struct libdecor_frame_private {
 	struct wl_surface *wl_surface;
 
 	struct libdecor_frame_interface *iface;
+	struct libdecor_frame_toplevel_interface *toplevel_iface;
 	void *user_data;
 
+	bool managed;
 	struct xdg_surface *xdg_surface;
 	struct xdg_toplevel *xdg_toplevel;
 	struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
@@ -484,6 +486,9 @@ init_shell_surface(struct libdecor_frame *frame)
 	struct libdecor_frame_private *frame_priv = frame->priv;
 	struct libdecor *context = frame_priv->context;
 
+	if (!frame->priv->managed)
+		return;
+
 	if (frame_priv->xdg_surface)
 		return;
 
@@ -500,11 +505,6 @@ init_shell_surface(struct libdecor_frame *frame)
 				  &xdg_toplevel_listener,
 				  frame);
 
-	frame_priv->decoration_mode =
-			ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
-	frame_priv->toplevel_decoration = NULL;
-	libdecor_frame_create_xdg_decoration(frame_priv);
-
 	if (frame_priv->state.parent) {
 		xdg_toplevel_set_parent(frame_priv->xdg_toplevel,
 					frame_priv->state.parent);
@@ -517,6 +517,9 @@ init_shell_surface(struct libdecor_frame *frame)
 		xdg_toplevel_set_app_id(frame_priv->xdg_toplevel,
 					frame_priv->state.app_id);
 	}
+
+	frame_priv->toplevel_decoration = NULL;
+	libdecor_frame_create_xdg_decoration(frame_priv);
 
 	if (frame_priv->pending_map)
 		do_map(frame);
@@ -556,6 +559,9 @@ decorate(struct libdecor *context,
 
 	frame->priv->visible = true;
 
+	frame->priv->decoration_mode =
+			ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+
 	return frame;
 }
 
@@ -569,9 +575,25 @@ libdecor_decorate(struct libdecor *context,
 
 	frame = decorate(context, wl_surface, user_data);
 	frame->priv->iface = iface;
+	frame->priv->managed = true;
 
 	if (context->init_done)
 		init_shell_surface(frame);
+
+	return frame;
+}
+
+LIBDECOR_EXPORT struct libdecor_frame *
+libdecor_decorate_unmanaged(struct libdecor *context,
+		  struct wl_surface *wl_surface,
+		  struct libdecor_frame_toplevel_interface *toplevel_iface,
+		  void *user_data)
+{
+	struct libdecor_frame *frame;
+
+	frame = decorate(context, wl_surface, user_data);
+	frame->priv->toplevel_iface = toplevel_iface;
+	frame->priv->managed = false;
 
 	return frame;
 }
@@ -734,6 +756,9 @@ notify_on_capability_change(struct libdecor_frame *frame,
 
 	plugin->priv->iface->frame_property_changed(plugin, frame);
 
+	if (!frame->priv->xdg_surface)
+		return;
+
 	if (!libdecor_frame_has_capability(frame, LIBDECOR_ACTION_RESIZE)) {
 		frame->priv->interactive_limits = frame->priv->state.content_limits;
 		/* set fixed window size */
@@ -825,16 +850,21 @@ libdecor_frame_show_window_menu(struct libdecor_frame *frame,
 				int x,
 				int y)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
+	if (frame->priv->managed) {
+		if (!frame->priv->xdg_toplevel) {
+			fprintf(stderr, "Can't show window menu before being mapped\n");
+			return;
+		}
 
-	if (!frame_priv->xdg_toplevel) {
-		fprintf(stderr, "Can't show window menu before being mapped\n");
-		return;
+		xdg_toplevel_show_window_menu(frame->priv->xdg_toplevel,
+					      wl_seat, serial,
+					      x, y);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->show_window_menu) {
+		frame->priv->toplevel_iface->show_window_menu(
+					frame, wl_seat, serial, x, y,
+					frame->priv->user_data);
 	}
-
-	xdg_toplevel_show_window_menu(frame_priv->xdg_toplevel,
-				      wl_seat, serial,
-				      x, y);
 }
 
 LIBDECOR_EXPORT void
@@ -880,7 +910,14 @@ libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
 				   int32_t x, int32_t y,
 				   int32_t width, int32_t height)
 {
-	xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
+	if (frame->priv->managed) {
+		xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
+	} else if (frame->priv->toplevel_iface &&
+	   frame->priv->toplevel_iface->set_window_geometry) {
+		frame->priv->toplevel_iface->set_window_geometry(
+					frame, x, y, width, height,
+					frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT enum libdecor_capabilities
@@ -889,8 +926,8 @@ libdecor_frame_get_capabilities(const struct libdecor_frame *frame)
 	return frame->priv->capabilities;
 }
 
-enum xdg_toplevel_resize_edge
-edge_to_xdg_edge(enum libdecor_resize_edge edge)
+LIBDECOR_EXPORT int
+libdecor_to_xdg_edge(enum libdecor_resize_edge edge)
 {
 	switch (edge) {
 	case LIBDECOR_RESIZE_EDGE_NONE:
@@ -916,18 +953,57 @@ edge_to_xdg_edge(enum libdecor_resize_edge edge)
 	abort();
 }
 
+LIBDECOR_EXPORT enum libdecor_window_state
+libdecor_from_xdg_states(struct wl_array *states)
+{
+	enum libdecor_window_state state = LIBDECOR_WINDOW_STATE_NONE;
+	enum xdg_toplevel_state *xdg_state;
+
+	wl_array_for_each(xdg_state, states) {
+		switch (*xdg_state) {
+		case XDG_TOPLEVEL_STATE_MAXIMIZED:
+			state |= LIBDECOR_WINDOW_STATE_MAXIMIZED;
+			break;
+		case XDG_TOPLEVEL_STATE_FULLSCREEN:
+			state |= LIBDECOR_WINDOW_STATE_FULLSCREEN;
+			break;
+		case XDG_TOPLEVEL_STATE_RESIZING:
+			break;
+		case XDG_TOPLEVEL_STATE_ACTIVATED:
+			state |= LIBDECOR_WINDOW_STATE_ACTIVE;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_LEFT:
+			state |= LIBDECOR_WINDOW_STATE_TILED_LEFT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_RIGHT:
+			state |= LIBDECOR_WINDOW_STATE_TILED_RIGHT;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_TOP:
+			state |= LIBDECOR_WINDOW_STATE_TILED_TOP;
+			break;
+		case XDG_TOPLEVEL_STATE_TILED_BOTTOM:
+			state |= LIBDECOR_WINDOW_STATE_TILED_BOTTOM;
+			break;
+		}
+	}
+
+	return state;
+}
+
 LIBDECOR_EXPORT void
 libdecor_frame_resize(struct libdecor_frame *frame,
 		      struct wl_seat *wl_seat,
 		      uint32_t serial,
 		      enum libdecor_resize_edge edge)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
-	enum xdg_toplevel_resize_edge xdg_edge;
-
-	xdg_edge = edge_to_xdg_edge(edge);
-	xdg_toplevel_resize(frame_priv->xdg_toplevel,
-			    wl_seat, serial, xdg_edge);
+	if (frame->priv->managed) {
+		xdg_toplevel_resize(frame->priv->xdg_toplevel,
+				    wl_seat, serial, libdecor_to_xdg_edge(edge));
+	} else if (frame->priv->toplevel_iface &&
+	   frame->priv->toplevel_iface->resize) {
+		frame->priv->toplevel_iface->resize(
+				frame, wl_seat, serial, edge, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
@@ -935,40 +1011,74 @@ libdecor_frame_move(struct libdecor_frame *frame,
 		    struct wl_seat *wl_seat,
 		    uint32_t serial)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
-
-	xdg_toplevel_move(frame_priv->xdg_toplevel, wl_seat, serial);
+	if (frame->priv->managed) {
+		xdg_toplevel_move(frame->priv->xdg_toplevel, wl_seat, serial);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->move) {
+		frame->priv->toplevel_iface->move(
+					frame, wl_seat, serial, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_set_minimized(struct libdecor_frame *frame)
 {
-	xdg_toplevel_set_minimized(frame->priv->xdg_toplevel);
+	if (frame->priv->managed) {
+		xdg_toplevel_set_minimized(frame->priv->xdg_toplevel);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->set_minimized) {
+		frame->priv->toplevel_iface->set_minimized(
+					frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_set_maximized(struct libdecor_frame *frame)
 {
-	xdg_toplevel_set_maximized(frame->priv->xdg_toplevel);
+	if (frame->priv->managed) {
+		xdg_toplevel_set_maximized(frame->priv->xdg_toplevel);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->set_maximized) {
+		frame->priv->toplevel_iface->set_maximized(
+					frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_unset_maximized(struct libdecor_frame *frame)
 {
-	xdg_toplevel_unset_maximized(frame->priv->xdg_toplevel);
+	if (frame->priv->managed) {
+		xdg_toplevel_unset_maximized(frame->priv->xdg_toplevel);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->unset_maximized) {
+		frame->priv->toplevel_iface->unset_maximized(
+					frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_set_fullscreen(struct libdecor_frame *frame,
 			      struct wl_output *output)
 {
-	xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, output);
+	if (frame->priv->managed) {
+		xdg_toplevel_set_fullscreen(frame->priv->xdg_toplevel, output);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->set_fullscreen) {
+		frame->priv->toplevel_iface->set_fullscreen(
+					frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_unset_fullscreen(struct libdecor_frame *frame)
 {
-	xdg_toplevel_unset_fullscreen(frame->priv->xdg_toplevel);
+	if (frame->priv->managed) {
+		xdg_toplevel_unset_fullscreen(frame->priv->xdg_toplevel);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->unset_fullscreen) {
+		frame->priv->toplevel_iface->unset_fullscreen(
+					frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT bool
@@ -980,7 +1090,12 @@ libdecor_frame_is_floating(struct libdecor_frame *frame)
 LIBDECOR_EXPORT void
 libdecor_frame_close(struct libdecor_frame *frame)
 {
-	xdg_toplevel_close(frame, frame->priv->xdg_toplevel);
+	if (frame->priv->managed) {
+		xdg_toplevel_close(frame, frame->priv->xdg_toplevel);
+	} else if (frame->priv->toplevel_iface &&
+		   frame->priv->toplevel_iface->close) {
+		frame->priv->toplevel_iface->close(frame, frame->priv->user_data);
+	}
 }
 
 bool
@@ -1086,9 +1201,13 @@ libdecor_frame_apply_state(struct libdecor_frame *frame,
 LIBDECOR_EXPORT void
 libdecor_frame_toplevel_commit(struct libdecor_frame *frame)
 {
-	struct libdecor_frame_private *frame_priv = frame->priv;
-
-	frame_priv->iface->commit(frame, frame_priv->user_data);
+	if (frame->priv->managed) {
+		frame->priv->iface->commit(frame, frame->priv->user_data);
+	}
+	else if (frame->priv->toplevel_iface &&
+		 frame->priv->toplevel_iface->commit) {
+		frame->priv->toplevel_iface->commit(frame, frame->priv->user_data);
+	}
 }
 
 LIBDECOR_EXPORT void
@@ -1100,14 +1219,21 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	if (configuration && configuration->has_window_state) {
-		frame_priv->window_state = configuration->window_state;
-		state->window_state = configuration->window_state;
-	} else {
-		state->window_state = frame_priv->window_state;
-	}
+	if (frame_priv->xdg_surface) {
+		if (configuration && configuration->has_window_state) {
+			frame_priv->window_state = configuration->window_state;
+			state->window_state = configuration->window_state;
+		} else {
+			state->window_state = frame_priv->window_state;
+		}
 
-	libdecor_frame_apply_state(frame, state);
+		libdecor_frame_apply_state(frame, state);
+	}
+	else {
+		frame_priv->window_state = state->window_state;
+		frame_priv->content_width = state->content_width;
+		frame_priv->content_height = state->content_height;
+	}
 
 	/* switch between decoration modes */
 	if (frame_has_visible_client_side_decoration(frame)) {
@@ -1121,7 +1247,7 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 						   frame_priv->content_height);
 	}
 
-	if (configuration) {
+	if (configuration && frame_priv->xdg_surface) {
 		xdg_surface_ack_configure(frame_priv->xdg_surface,
 					  configuration->serial);
 	}
@@ -1193,6 +1319,41 @@ libdecor_frame_get_window_state(struct libdecor_frame *frame)
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
 	return frame_priv->window_state;
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_size_window_to_content(struct libdecor_frame *frame,
+				      const int *window_width,
+				      const int *window_height,
+				      enum libdecor_window_state window_state,
+				      int *content_width,
+				      int *content_height)
+{
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+	struct libdecor_configuration configuration;
+
+	configuration.window_width = *window_width;
+	configuration.window_height = *window_height;
+	configuration.has_size = true;
+
+	configuration.window_state = window_state;
+	configuration.has_window_state = true;
+
+	return plugin->priv->iface->configuration_get_content_size(
+				plugin, &configuration, frame,
+				content_width, content_height);
+}
+
+LIBDECOR_EXPORT bool
+libdecor_frame_size_content_to_window(struct libdecor_frame *frame,
+				      struct libdecor_state *state,
+				      int *window_width,
+				      int *window_height)
+{
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+
+	return plugin->priv->iface->frame_get_window_size_for(plugin, frame,
+				state, window_width, window_height);
 }
 
 LIBDECOR_EXPORT int

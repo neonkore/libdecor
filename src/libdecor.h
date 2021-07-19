@@ -171,6 +171,37 @@ struct libdecor_frame_interface {
 	void (* reserved9)(void);
 };
 
+struct libdecor_frame_toplevel_interface {
+	void (* show_window_menu)(struct libdecor_frame *frame,
+				  struct wl_seat *seat,
+				  uint32_t serial,
+				  int32_t x,
+				  int32_t y,
+				  void *user_data);
+	void (* move)(struct libdecor_frame *frame,
+		      struct wl_seat *seat,
+		      uint32_t serial,
+		      void *user_data);
+	void (* resize)(struct libdecor_frame *frame,
+			struct wl_seat *seat,
+			uint32_t serial,
+			enum libdecor_resize_edge edge,
+			void *user_data);
+	void (* set_maximized)(struct libdecor_frame *frame, void *user_data);
+	void (* unset_maximized)(struct libdecor_frame *frame, void *user_data);
+	void (* set_fullscreen)(struct libdecor_frame *frame, void *user_data);
+	void (* unset_fullscreen)(struct libdecor_frame *frame, void *user_data);
+	void (* set_minimized)(struct libdecor_frame *frame, void *user_data);
+	void (* close)(struct libdecor_frame *frame, void *user_data);
+	void (* commit)(struct libdecor_frame *frame, void *user_data);
+	void (* set_window_geometry)(struct libdecor_frame *frame,
+				     int32_t x,
+				     int32_t y,
+				     int32_t width,
+				     int32_t height,
+				     void *user_data);
+};
+
 /**
  * Remove a reference to the libdecor instance. When the reference count
  * reaches zero, it is freed.
@@ -217,6 +248,12 @@ struct libdecor_frame *
 libdecor_decorate(struct libdecor *context,
 		  struct wl_surface *wl_surface,
 		  struct libdecor_frame_interface *iface,
+		  void *user_data);
+
+struct libdecor_frame *
+libdecor_decorate_unmanaged(struct libdecor *context,
+		  struct wl_surface *wl_surface,
+		  struct libdecor_frame_toplevel_interface *toplevel_iface,
 		  void *user_data);
 
 /**
@@ -367,6 +404,18 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 				    int content_height);
 
 /**
+ * convert from libdecor edge enums to xdg
+ */
+int
+libdecor_to_xdg_edge(enum libdecor_resize_edge edge);
+
+/**
+ * convert from xdg window states to libdecor
+ */
+enum libdecor_window_state
+libdecor_from_xdg_states(struct wl_array *states);
+
+/**
  * Initiate an interactive resize.
  *
  * This roughly translates to xdg_toplevel_resize().
@@ -479,6 +528,20 @@ libdecor_frame_get_xdg_surface(struct libdecor_frame *frame);
 struct xdg_toplevel *
 libdecor_frame_get_xdg_toplevel(struct libdecor_frame *frame);
 
+bool
+libdecor_frame_size_window_to_content(struct libdecor_frame *frame,
+				      const int *window_width,
+				      const int *window_height,
+				      enum libdecor_window_state window_state,
+				      int *content_width,
+				      int *content_height);
+
+bool
+libdecor_frame_size_content_to_window(struct libdecor_frame *frame,
+				      struct libdecor_state *state,
+				      int *window_width,
+				      int *window_height);
+
 /**
  * Create a new content surface state.
  */
@@ -509,6 +572,11 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 					struct libdecor_frame *frame,
 					int *width,
 					int *height);
+
+bool
+libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
+				       int *width,
+				       int *height);
 
 /**
  * Get the window state for this configuration.
