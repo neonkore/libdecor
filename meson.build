@@ -5,8 +5,20 @@ project('libdecor', 'c',
 )
 
 version_array = meson.project_version().split('.')
+libdecor_major_version = version_array[0].to_int()
+libdecor_minor_version = version_array[1].to_int()
+libdecor_micro_version = version_array[2].to_int()
 
-libdecor_api_version_string = '@0@.@1@'.format(version_array[0], version_array[1])
+libdecor_api_version_string = '@0@'.format(libdecor_major_version)
+
+libdecor_interface_age = libdecor_micro_version
+libdecor_binary_age = 100 * libdecor_minor_version + libdecor_micro_version
+
+# Maintain compatibility with libtool versioning
+libdecor_soversion = 0
+current = libdecor_binary_age - libdecor_interface_age
+revision = libdecor_interface_age
+libdecor_libversion = '@0@.@1@.@2@'.format(libdecor_soversion, current, revision)
 
 plugin_api_version = 1
 plugin_api_version_string = '@0@'.format(plugin_api_version)

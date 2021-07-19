@@ -85,6 +85,8 @@ libdecor = both_libraries(libdecor_name,
     libdecor_sources,
     libdecor_built_sources,
   ],
+  soversion: libdecor_soversion,
+  version: libdecor_libversion,
   include_directories: libdecor_includes,
   c_args: libdecor_c_args,
   dependencies: [
