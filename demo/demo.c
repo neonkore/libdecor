@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
+#include <getopt.h>
 
 #include "libdecor.h"
 #include "utils.h"
@@ -99,6 +100,8 @@ struct popup {
 
 struct window {
 	struct wl_surface *wl_surface;
+	struct xdg_surface *xdg_surface;
+	struct xdg_toplevel *xdg_toplevel;
 	struct buffer *buffer;
 	struct libdecor_frame *frame;
 	int content_width;
@@ -218,6 +221,75 @@ shm_format(void *data,
 
 static struct wl_shm_listener shm_listener = {
 	shm_format
+};
+
+static void
+win_toplevel_configure(void *data,
+		       struct xdg_toplevel *xdg_toplevel,
+		       int32_t width,
+		       int32_t height,
+		       struct wl_array *states)
+{
+	struct window *window = data;
+
+	window->window_state = libdecor_from_xdg_states(states);
+
+	printf("xdg cfg: %i x %i\n", width, height);
+
+	if (width == 0 || height == 0) {
+		window->configured_width = window->floating_width;
+		window->configured_height = window->floating_height;
+	} else {
+		libdecor_frame_size_window_to_content(window->frame,
+						      &width,
+						      &height,
+						      window->window_state,
+						      &window->configured_width,
+						      &window->configured_height);
+	}
+
+	printf("cnt cfg: %i x %i\n", window->configured_width, window->configured_height);
+}
+
+static void
+win_toplevel_close(void *data,
+		   struct xdg_toplevel *xdg_toplevel)
+{
+	exit(EXIT_SUCCESS);
+}
+
+static const struct xdg_toplevel_listener win_toplevel_listener = {
+	win_toplevel_configure,
+	win_toplevel_close,
+};
+
+static void
+win_surface_configure(void *data,
+		      struct xdg_surface *xdg_surface,
+		      uint32_t serial)
+{
+	struct window *window = data;
+	struct libdecor_state *state;
+
+	state = libdecor_state_new(window->configured_width,
+				   window->configured_height);
+	libdecor_state_set_window_state(state, window->window_state);
+	libdecor_frame_commit(window->frame, state, NULL);
+	libdecor_state_free(state);
+
+	xdg_surface_ack_configure(xdg_surface, serial);
+
+	/* store floating dimensions */
+	if (libdecor_frame_is_floating(window->frame)) {
+		window->floating_width = window->configured_width;
+		window->floating_height = window->configured_height;
+	}
+
+	redraw(window);
+}
+
+static const struct xdg_surface_listener win_surface_listener = {
+	win_surface_configure,
 };
 
 static void
@@ -490,7 +562,7 @@ open_popup(struct seat *seat)
 	popup->wl_surface = wl_compositor_create_surface(wl_compositor);
 	popup->xdg_surface = xdg_wm_base_get_xdg_surface (xdg_wm_base,
 							  popup->wl_surface);
-	popup->parent = libdecor_frame_get_xdg_surface(window->frame);
+	popup->parent = window->xdg_surface;
 	popup->window = window;
 	popup->seat = seat;
 	positioner = create_positioner(seat);
@@ -1102,6 +1174,8 @@ redraw(struct window *window)
 		     window->configured_height, window->scale,
 		     window->window_state);
 
+	printf("buf: %i x %i\n", window->configured_width, window->configured_height);
+
 	wl_surface_attach(window->wl_surface, buffer->wl_buffer, 0, 0);
 	wl_surface_set_buffer_scale(window->wl_surface, window->scale);
 	wl_surface_damage_buffer(window->wl_surface, 0, 0,
@@ -1181,6 +1255,97 @@ static struct libdecor_frame_interface libdecor_frame_iface = {
 };
 
 static void
+toplevel_show_window_menu(struct libdecor_frame *frame,
+			  struct wl_seat *seat,
+			  uint32_t serial,
+			  int32_t x,
+			  int32_t y,
+			  void *user_data)
+{
+	xdg_toplevel_show_window_menu(((struct window *) user_data)->xdg_toplevel, seat, serial, x, y);
+}
+
+static void
+toplevel_move(struct libdecor_frame *frame,
+	      struct wl_seat *seat,
+	      uint32_t serial,
+	      void *user_data)
+{
+	xdg_toplevel_move(((struct window *) user_data)->xdg_toplevel, seat, serial);
+}
+
+static void
+toplevel_resize(struct libdecor_frame *frame,
+		struct wl_seat *seat,
+		uint32_t serial,
+		enum libdecor_resize_edge edge,
+		void *user_data)
+{
+	xdg_toplevel_resize(((struct window *) user_data)->xdg_toplevel,
+			    seat, serial,
+			    libdecor_to_xdg_edge(edge));
+}
+
+static void
+toplevel_set_maximized(struct libdecor_frame *frame,
+		       void *user_data)
+{
+	xdg_toplevel_set_maximized(((struct window *) user_data)->xdg_toplevel);
+}
+
+static void
+toplevel_unset_maximized(struct libdecor_frame *frame,
+			 void *user_data)
+{
+	xdg_toplevel_unset_maximized(((struct window *) user_data)->xdg_toplevel);
+}
+
+static void
+toplevel_set_fullscreen(struct libdecor_frame *frame,
+			void *user_data)
+{
+	xdg_toplevel_set_fullscreen(((struct window *) user_data)->xdg_toplevel, NULL);
+}
+
+static void
+toplevel_unset_fullscreen(struct libdecor_frame *frame,
+			  void *user_data)
+{
+	xdg_toplevel_unset_fullscreen(((struct window *) user_data)->xdg_toplevel);
+}
+
+static void
+toplevel_set_minimized(struct libdecor_frame *frame,
+		       void *user_data)
+{
+	xdg_toplevel_set_minimized(((struct window *) user_data)->xdg_toplevel);
+}
+
+static void
+toplevel_set_window_geometry(struct libdecor_frame *frame,
+			     int32_t x, int32_t y,
+			     int32_t width, int32_t height,
+			     void *user_data)
+{
+	xdg_surface_set_window_geometry(((struct window *) user_data)->xdg_surface,
+					x ,y, width, height);
+}
+
+static struct libdecor_frame_toplevel_interface libdecor_toplevel_iface = {
+	toplevel_show_window_menu,
+	toplevel_move,
+	toplevel_resize,
+	toplevel_set_maximized,
+	toplevel_unset_maximized,
+	toplevel_set_fullscreen,
+	toplevel_unset_fullscreen,
+	toplevel_set_minimized,
+	handle_close,
+	handle_commit,
+	toplevel_set_window_geometry,
+};
+
+static void
 surface_enter(void *data,
 	      struct wl_surface *wl_surface,
 	      struct wl_output *wl_output)
@@ -1255,6 +1420,17 @@ main(int argc,
 	struct libdecor *context;
 	struct output *output;
 
+	int unmanaged;
+
+	/* define program arguments */
+	struct option options[] = {
+		{"unmanaged", no_argument, &unmanaged, 1},
+		{0, 0, 0, 0},
+	};
+
+	for (int i = 0, c = 0; c != -1;
+	     c = getopt_long(argc, argv, "", options, &i));
+
 	/* write all output to stdout immediately */
 	setbuf(stdout, NULL);
 
@@ -1292,12 +1468,40 @@ main(int argc,
 	window->floating_width = DEFAULT_WIDTH;
 	window->floating_height = DEFAULT_HEIGHT;
 
+	/* create XDG surfaces if requested */
+	if (unmanaged) {
+		/* The client will manage its own xdg-toplevel surface. */
+		printf("xdg-toplevel surface will be manage by client\n");
+		window->xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base, window->wl_surface);
+		xdg_surface_add_listener(window->xdg_surface,
+					 &win_surface_listener,
+					 window);
+
+		window->xdg_toplevel = xdg_surface_get_toplevel(window->xdg_surface);
+		xdg_toplevel_add_listener(window->xdg_toplevel,
+					  &win_toplevel_listener,
+					  window);
+	}
+
 	context = libdecor_new(wl_display, &libdecor_iface);
-	window->frame = libdecor_decorate(context, window->wl_surface,
-					  &libdecor_frame_iface, window);
-	libdecor_frame_set_app_id(window->frame, "libdecor-demo");
-	libdecor_frame_set_title(window->frame, "libdecor demo");
-	libdecor_frame_map(window->frame);
+	if (unmanaged) {
+		window->frame = libdecor_decorate_unmanaged(context,
+							    window->wl_surface,
+							    &libdecor_toplevel_iface,
+							    window);
+		libdecor_frame_set_title(window->frame, "libdecor demo");
+		xdg_toplevel_set_title(window->xdg_toplevel, "libdecor demo");
+		xdg_toplevel_set_app_id(window->xdg_toplevel, "libdecor-demo");
+		wl_surface_commit(window->wl_surface);
+	}
+	else {
+		window->frame = libdecor_decorate(context, window->wl_surface,
+						  &libdecor_frame_iface, window);
+		window->xdg_surface = libdecor_frame_get_xdg_surface(window->frame);
+		libdecor_frame_set_title(window->frame, "libdecor demo");
+		libdecor_frame_set_app_id(window->frame, "libdecor-demo");
+		libdecor_frame_map(window->frame);
+	}
 
 	while (libdecor_dispatch(context, -1) >= 0);
 
