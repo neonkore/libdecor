@@ -105,6 +105,8 @@ struct window {
 	int content_height;
 	int configured_width;
 	int configured_height;
+	int floating_width;
+	int floating_height;
 	enum libdecor_window_state window_state;
 	struct wl_list outputs;
 	int scale;
@@ -179,6 +181,9 @@ resize(struct window *window, int width, int height)
 	/* force redraw of content and commit */
 	window->configured_width = width;
 	window->configured_height = height;
+	/* store floating dimensions */
+	window->floating_width = width;
+	window->floating_height = height;
 	redraw(window);
 }
 
@@ -1121,8 +1126,8 @@ handle_configure(struct libdecor_frame *frame,
 		height = window->content_height;
 	}
 
-	width = (width == 0) ? DEFAULT_WIDTH : width;
-	height = (height == 0) ? DEFAULT_HEIGHT : height;
+	width = (width == 0) ? window->floating_width : width;
+	height = (height == 0) ? window->floating_height : height;
 
 	window->configured_width = width;
 	window->configured_height = height;
@@ -1136,6 +1141,12 @@ handle_configure(struct libdecor_frame *frame,
 	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(frame, state, configuration);
 	libdecor_state_free(state);
+
+	/* store floating dimensions */
+	if (libdecor_frame_is_floating(window->frame)) {
+		window->floating_width = width;
+		window->floating_height = height;
+	}
 
 	redraw(window);
 }
@@ -1276,6 +1287,10 @@ main(int argc,
 	wl_list_init(&window->outputs);
 	window->wl_surface = wl_compositor_create_surface(wl_compositor);
 	wl_surface_add_listener(window->wl_surface, &surface_listener, window);
+
+	/* initialise content dimensions */
+	window->floating_width = DEFAULT_WIDTH;
+	window->floating_height = DEFAULT_HEIGHT;
 
 	context = libdecor_new(wl_display, &libdecor_iface);
 	window->frame = libdecor_decorate(context, window->wl_surface,
