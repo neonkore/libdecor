@@ -116,10 +116,6 @@ struct libdecor_frame_private {
 
 	enum libdecor_window_state window_state;
 
-	/* stored dimensions of the floating state */
-	int floating_width;
-	int floating_height;
-
 	enum zxdg_toplevel_decoration_v1_mode decoration_mode;
 
 	enum libdecor_capabilities capabilities;
@@ -422,27 +418,8 @@ xdg_toplevel_configure(void *user_data,
 	frame_priv->pending_configuration = libdecor_configuration_new();
 
 	frame_priv->pending_configuration->has_size = true;
-	if (width == 0 && height == 0) {
-		/* client needs to determine window dimensions
-		 * This might happen at the first configuration or after an
-		 * unmaximizing request. In any case, we will forward the stored
-		 * unmaximized state, which will either contain values stored
-		 * by the maximizing request, or 0.
-		 */
-		frame_priv->pending_configuration->window_width =
-				frame->priv->floating_width;
-		frame_priv->pending_configuration->window_height =
-				frame->priv->floating_height;
-	} else {
-		/* store current floating state */
-		if (state_is_floating(window_state)) {
-			frame->priv->floating_width = width;
-			frame->priv->floating_height = height;
-		}
-
-		frame_priv->pending_configuration->window_width = width;
-		frame_priv->pending_configuration->window_height = height;
-	}
+	frame_priv->pending_configuration->window_width = width;
+	frame_priv->pending_configuration->window_height = height;
 
 	frame_priv->pending_configuration->has_window_state = true;
 	frame_priv->pending_configuration->window_state = window_state;
@@ -1125,13 +1102,6 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 		libdecor_frame_set_window_geometry(frame, 0, 0,
 						   frame_priv->content_width,
 						   frame_priv->content_height);
-	}
-
-	/* set the floating dimensions via the application's requested content size */
-	if (configuration == NULL) {
-		frame_get_window_size_for(frame, state,
-					  &frame->priv->floating_width,
-					  &frame->priv->floating_height);
 	}
 
 	if (configuration) {
