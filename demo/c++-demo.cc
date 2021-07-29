@@ -287,8 +287,6 @@ private:
 	struct libdecor_frame *frame;
 	struct libdecor_frame_interface libdecor_frame_iface;
 
-	Buffer *buffer;
-
 	int configured_width;
 	int configured_height;
 	enum libdecor_window_state window_state;
