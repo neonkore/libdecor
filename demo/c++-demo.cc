@@ -188,6 +188,7 @@ class Window {
 public:
 	Window(struct libdecor *context,
 	       struct wl_compositor *wl_compositor)
+		: floating_width(DEFAULT_WIDTH), floating_height(DEFAULT_HEIGHT)
 	{
 		this->wl_surface = wl_compositor_create_surface(wl_compositor);
 
@@ -230,8 +231,8 @@ private:
 		libdecor_configuration_get_content_size(configuration, frame,
 							&width, &height);
 
-		width = (width == 0) ? DEFAULT_WIDTH : width;
-		height = (height == 0) ? DEFAULT_HEIGHT : height;
+		width = (width == 0) ? this->floating_width : width;
+		height = (height == 0) ? this->floating_height : height;
 
 		this->configured_width = width;
 		this->configured_height = height;
@@ -245,6 +246,12 @@ private:
 		state = libdecor_state_new(width, height);
 		libdecor_frame_commit(frame, state, configuration);
 		libdecor_state_free(state);
+
+		/* store floating dimensions */
+		if (libdecor_frame_is_floating(this->frame)) {
+			this->floating_width = width;
+			this->floating_height = height;
+		}
 
 		this->redraw();
 	}
@@ -290,6 +297,9 @@ private:
 	int configured_width;
 	int configured_height;
 	enum libdecor_window_state window_state;
+
+	int floating_width;
+	int floating_height;
 };
 
 static Window *window;
