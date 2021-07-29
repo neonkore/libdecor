@@ -54,6 +54,8 @@ struct window {
 	EGLSurface egl_surface;
 	int content_width;
 	int content_height;
+	int floating_width;
+	int floating_height;
 	bool open;
 	bool configured;
 };
@@ -69,7 +71,8 @@ frame_configure(struct libdecor_frame *frame,
 
 	if (!libdecor_configuration_get_content_size(configuration, frame,
 						     &width, &height)) {
-		height = width = default_size;
+		width = window->floating_width;
+		height = window->floating_height;
 	}
 
 	window->content_width = width;
@@ -82,6 +85,12 @@ frame_configure(struct libdecor_frame *frame,
 	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(frame, state, configuration);
 	libdecor_state_free(state);
+
+	/* store floating dimensions */
+	if (libdecor_frame_is_floating(window->frame)) {
+		window->floating_width = width;
+		window->floating_height = height;
+	}
 
 	window->configured = true;
 }
@@ -277,6 +286,7 @@ main(int argc, char *argv[])
 	window->client = client;
 	window->open = true;
 	window->configured = false;
+	window->floating_width = window->floating_height = default_size;
 
 	setup(window);
 
