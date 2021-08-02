@@ -443,6 +443,10 @@ libdecor_frame_unset_fullscreen(struct libdecor_frame *frame);
  *
  * A window is floating when it's not maximized, tiled, fullscreen, or in any
  * similar way with a fixed size and state.
+ * Note that this function uses the "applied" configuration. If this function
+ * is used in the 'configure' callback, the provided configuration has to be
+ * applied via 'libdecor_frame_commit' first, before it will reflect the current
+ * window state from the provided configuration.
  */
 bool
 libdecor_frame_is_floating(struct libdecor_frame *frame);
