@@ -42,6 +42,9 @@
 #include "libdecor.h"
 #include "utils.h"
 #include "cursor-settings.h"
+extern "C" {
+#include "os-compatibility.h"
+}
 
 #include "xdg-shell-client-protocol.h"
 
@@ -91,7 +94,7 @@ public:
 		stride = width * 4;
 		size = stride * height;
 
-		fd = create_anonymous_file(size);
+		fd = os_create_anonymous_file(size);
 		if (fd < 0) {
 			cerr << "Creating a buffer file for " << size <<
 				" B failed: " << strerror(errno) << endl;
@@ -144,30 +147,6 @@ public:
 	}
 
 private:
-	static int create_anonymous_file(off_t size)
-	{
-		int fd;
-		int ret;
-
-		fd = memfd_create("libdecor-demo", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-
-		if (fd < 0)
-			return -1;
-
-		fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
-
-		do {
-			ret = posix_fallocate(fd, 0, size);
-		} while (ret == EINTR);
-		if (ret != 0) {
-			close(fd);
-			errno = ret;
-			return -1;
-		}
-
-		return fd;
-	}
-
 	static void buffer_release(void *user_data,
 				   struct wl_buffer *wl_buffer)
 	{

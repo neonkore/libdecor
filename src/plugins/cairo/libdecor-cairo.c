@@ -39,6 +39,7 @@
 #include "libdecor-plugin.h"
 #include "utils.h"
 #include "cursor-settings.h"
+#include "os-compatibility.h"
 
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
@@ -538,32 +539,6 @@ libdecor_plugin_cairo_frame_new(struct libdecor_plugin *plugin)
 	return &frame_cairo->frame;
 }
 
-static int
-create_anonymous_file(off_t size)
-{
-	int ret;
-
-	int fd;
-
-	fd = memfd_create("libdecor-cairo", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-
-	if (fd < 0)
-		return -1;
-
-	fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
-
-	do {
-		ret = posix_fallocate(fd, 0, size);
-	} while (ret == EINTR);
-	if (ret != 0) {
-		close(fd);
-		errno = ret;
-		return -1;
-	}
-
-	return fd;
-}
-
 static void
 toggle_maximized(struct libdecor_frame *const frame)
 {
@@ -611,7 +586,7 @@ create_shm_buffer(struct libdecor_plugin_cairo *plugin_cairo,
 	stride = buffer_width * 4;
 	size = stride * buffer_height;
 
-	fd = create_anonymous_file(size);
+	fd = os_create_anonymous_file(size);
 	if (fd < 0) {
 		fprintf(stderr, "creating a buffer file for %d B failed: %s\n",
 			size, strerror(errno));

@@ -50,8 +50,6 @@ dbus_dep = dependency('dbus-1', version: dbus_req, required: get_option('dbus'))
 
 # list of (function, prefix)
 required_functions = [
-  ['memfd_create', '#define _GNU_SOURCE\n#include <sys/mman.h>'],
-  ['posix_fallocate', '#define _GNU_SOURCE\n#include <fcntl.h>'],
   ['asprintf', '#define _GNU_SOURCE\n#include <stdio.h>'],
 ]
 foreach function : required_functions
@@ -78,6 +76,16 @@ cdata.set_quoted('LIBDECOR_PLUGIN_DIR', plugindir)
 cdata.set('LIBDECOR_PLUGIN_API_VERSION', plugin_api_version)
 if dbus_dep.found()
   cdata.set('HAS_DBUS', true)
+endif
+
+if cc.has_function('mkostemp', prefix: '#include <stdlib.h>')
+  cdata.set('HAVE_MKOSTEMP', true)
+endif
+if cc.has_function('posix_fallocate', prefix: '#define _GNU_SOURCE\n#include <fcntl.h>')
+  cdata.set('HAVE_POSIX_FALLOCATE', true)
+endif
+if cc.has_function('memfd_create', prefix: '#define _GNU_SOURCE\n#include <sys/mman.h>')
+  cdata.set('HAVE_MEMFD_CREATE', true)
 endif
 
 config_h = configure_file(

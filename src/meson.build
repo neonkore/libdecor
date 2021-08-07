@@ -79,6 +79,16 @@ cursor_settings_dep = declare_dependency(
   dependencies: [dbus_dep],
 )
 
+## os compatibility
+os_compatibility = static_library('os_compatibility',
+  sources: ['os-compatibility.c'],
+  include_directories: [top_includepath],
+)
+
+os_compatibility_dep = declare_dependency(
+  link_with: os_compatibility,
+)
+
 ## core decor library
 libdecor = shared_library(libdecor_name,
   sources: [

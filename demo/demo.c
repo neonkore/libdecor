@@ -41,6 +41,7 @@
 #include "libdecor.h"
 #include "utils.h"
 #include "cursor-settings.h"
+#include "os-compatibility.h"
 
 #include "xdg-shell-client-protocol.h"
 
@@ -986,32 +987,6 @@ static const struct wl_buffer_listener buffer_listener = {
 	buffer_release
 };
 
-static int
-create_anonymous_file(off_t size)
-{
-	int fd;
-
-	int ret;
-
-	fd = memfd_create("libdecor-demo", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-
-	if (fd < 0)
-		return -1;
-
-	fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
-
-	do {
-		ret = posix_fallocate(fd, 0, size);
-	} while (ret == EINTR);
-	if (ret != 0) {
-		close(fd);
-		errno = ret;
-		return -1;
-	}
-
-	return fd;
-}
-
 static struct buffer *
 create_shm_buffer(int width,
 		  int height,
@@ -1025,7 +1000,7 @@ create_shm_buffer(int width,
 	stride = width * 4;
 	size = stride * height;
 
-	fd = create_anonymous_file(size);
+	fd = os_create_anonymous_file(size);
 	if (fd < 0) {
 		fprintf(stderr, "creating a buffer file for %d B failed: %s\n",
 			size, strerror(errno));
