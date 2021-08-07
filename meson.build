@@ -1,7 +1,10 @@
 project('libdecor', 'c',
   version: '0.1.0',
   meson_version: '>= 0.47.0',
-  license: 'MIT'
+  license: 'MIT',
+  default_options: [
+    'c_std=c99',
+  ],
 )
 
 version_array = meson.project_version().split('.')
