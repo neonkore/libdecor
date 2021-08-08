@@ -5,7 +5,7 @@ wayland_cursor_dep = dependency('wayland-cursor')
 math_dep = cc.find_library('m')
 
 egl_dep = dependency('egl')
-gl_dep = dependency('gl')
+gl_dep = dependency('opengl')
 wayland_egl_dep = dependency('wayland-egl')
 
 xkb_dep = dependency('xkbcommon')
