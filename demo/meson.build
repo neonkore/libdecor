@@ -47,7 +47,7 @@ executable('libdecor-demo',
     wayland_cursor_dep,
     cursor_settings_dep,
     xkb_dep],
-  install: false,
+  install: get_option('install_demo'),
 )
 
 executable('libdecor-egl',
@@ -59,7 +59,7 @@ executable('libdecor-egl',
     egl_dep,
     gl_dep,
     math_dep],
-  install: false,
+  install: get_option('install_demo'),
 )
 
 executable('libdecor-c++-demo',
@@ -79,5 +79,5 @@ executable('libdecor-c++-demo',
     wayland_cursor_dep,
     cursor_settings_dep,
     xkb_dep],
-  install: false,
+  install: get_option('install_demo'),
 )
