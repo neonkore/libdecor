@@ -112,6 +112,9 @@ pkg.generate(
   name: libdecor_full_name,
   description: 'library for Wayland client-side window decors',
   libraries: libdecor,
+  requires_private: [
+    'wayland-client',
+  ],
   subdirs: libdecor_full_name,
   version: meson.project_version()
 )
