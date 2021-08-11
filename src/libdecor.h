@@ -487,6 +487,13 @@ libdecor_state_new(int width,
 		   int height);
 
 /**
+ * Set the window state for the libdecor state.
+ */
+void
+libdecor_state_set_window_state(struct libdecor_state *state,
+				enum libdecor_window_state window_state);
+
+/**
  * Free a content surface state.
  */
 void

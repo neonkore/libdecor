@@ -214,6 +214,13 @@ libdecor_state_new(int width,
 }
 
 LIBDECOR_EXPORT void
+libdecor_state_set_window_state(struct libdecor_state *state,
+				enum libdecor_window_state window_state)
+{
+	state->window_state = window_state;
+}
+
+LIBDECOR_EXPORT void
 libdecor_state_free(struct libdecor_state *state)
 {
 	free(state);
