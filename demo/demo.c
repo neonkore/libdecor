@@ -1250,10 +1250,19 @@ int
 main(int argc,
      char **argv)
 {
+	struct timeval start;
+	struct timeval now;
 	struct wl_display *wl_display;
 	struct wl_registry *wl_registry;
 	struct libdecor *context;
 	struct output *output;
+	int timeout = -1;
+	bool timed_quit = false;
+
+	if (argc > 1 && strcmp(argv[1], "--timed-quit") == 0) {
+		timed_quit = true;
+		timeout = 500; /* ms */
+	}
 
 	/* write all output to stdout immediately */
 	setbuf(stdout, NULL);
@@ -1299,7 +1308,17 @@ main(int argc,
 	libdecor_frame_set_title(window->frame, "libdecor demo");
 	libdecor_frame_map(window->frame);
 
-	while (libdecor_dispatch(context, -1) >= 0);
+	gettimeofday(&start, NULL);
+
+	while (libdecor_dispatch(context, timeout) >= 0) {
+		if (timed_quit) {
+			gettimeofday(&now, NULL);
+			if (now.tv_sec >= start.tv_sec + 2) {
+				fprintf(stderr, "Exiting due to --timed-quit\n");
+				libdecor_frame_close(window->frame);
+			}
+		}
+	}
 
 	free_outputs();
 
