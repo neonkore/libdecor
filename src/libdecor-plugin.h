@@ -97,30 +97,12 @@ struct libdecor_plugin_interface {
 			      struct libdecor_configuration *configuration);
 	void (*frame_property_changed)(struct libdecor_plugin *plugin,
 				       struct libdecor_frame *frame);
-	void (* frame_translate_coordinate)(struct libdecor_plugin *plugin,
-					    struct libdecor_frame *frame,
-					    int content_x,
-					    int content_y,
-					    int *window_x,
-					    int *window_y);
 	void (* frame_popup_grab)(struct libdecor_plugin *plugin,
 				  struct libdecor_frame *frame,
 				  const char *seat_name);
 	void (* frame_popup_ungrab)(struct libdecor_plugin *plugin,
 				    struct libdecor_frame *frame,
 				    const char *seat_name);
-
-	bool (* frame_get_window_size_for)(struct libdecor_plugin *plugin,
-					   struct libdecor_frame *frame,
-					   struct libdecor_state *state,
-					   int *window_width,
-					   int *window_height);
-
-	bool (* configuration_get_content_size)(struct libdecor_plugin *plugin,
-						struct libdecor_configuration *configuration,
-						struct libdecor_frame *frame,
-						int *content_width,
-						int *content_height);
 
 	bool (* frame_get_border_size)(struct libdecor_plugin *plugin,
 				       struct libdecor_frame *frame,
@@ -190,11 +172,6 @@ libdecor_state_get_content_height (struct libdecor_state *state);
 
 enum libdecor_window_state
 libdecor_state_get_window_state(struct libdecor_state *state);
-
-bool
-libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
-				       int *width,
-				       int *height);
 
 int
 libdecor_plugin_init(struct libdecor_plugin *plugin,

@@ -245,36 +245,20 @@ frame_get_window_size_for(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	if (frame_has_visible_client_side_decoration(frame)) {
-		return plugin->priv->iface->frame_get_window_size_for(
-					plugin, frame, state,
-					window_width, window_height);
-	} else {
-		*window_width = state->content_width;
-		*window_height = state->content_height;
-		return true;
-	}
-}
+	*window_width = state->content_width;
+	*window_height = state->content_height;
 
-static bool
-window_size_to_content_size(struct libdecor_configuration *configuration,
-			    struct libdecor_frame *frame,
-			    int *content_width,
-			    int *content_height)
-{
-	struct libdecor_frame_private *frame_priv = frame->priv;
-	struct libdecor *context = frame_priv->context;
-	struct libdecor_plugin *plugin = context->plugin;
-
-	if (frame_has_visible_client_side_decoration(frame)) {
-		return plugin->priv->iface->configuration_get_content_size(
-					plugin, configuration, frame,
-					content_width, content_height);
-	} else {
-		*content_width = configuration->window_width;
-		*content_height = configuration->window_height;
-		return true;
+	if (frame_has_visible_client_side_decoration(frame) &&
+	    plugin->priv->iface->frame_get_border_size) {
+		int left, right, top, bottom;
+		if (!plugin->priv->iface->frame_get_border_size(
+			plugin, frame, NULL, &left, &right, &top, &bottom))
+			return false;
+		*window_width += left + right;
+		*window_height += top + bottom;
 	}
+
+	return true;
 }
 
 LIBDECOR_EXPORT bool
@@ -283,36 +267,9 @@ libdecor_configuration_get_content_size(struct libdecor_configuration *configura
 					int *width,
 					int *height)
 {
-	int content_width;
-	int content_height;
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
 
-	if (!configuration->has_size)
-		return false;
-
-	if (configuration->window_width == 0 || configuration->window_height == 0)
-		return false;
-
-	if (!window_size_to_content_size(configuration,
-					 frame,
-					 &content_width,
-					 &content_height))
-		return false;
-
-	*width = content_width;
-	*height = content_height;
-
-	if (state_is_floating(configuration->window_state)) {
-		constrain_content_size(frame, width, height);
-	}
-
-	return true;
-}
-
-LIBDECOR_EXPORT bool
-libdecor_configuration_get_window_size(struct libdecor_configuration *configuration,
-				       int *width,
-				       int *height)
-{
+	/* get configured toplevel dimensions */
 	if (!configuration->has_size)
 		return false;
 
@@ -321,6 +278,24 @@ libdecor_configuration_get_window_size(struct libdecor_configuration *configurat
 
 	*width = configuration->window_width;
 	*height = configuration->window_height;
+
+	/* remove plugin-specific border size */
+	if (frame_has_visible_client_side_decoration(frame) &&
+	    plugin->priv->iface->frame_get_border_size) {
+		int left, right, top, bottom;
+		if (!plugin->priv->iface->frame_get_border_size(
+			plugin, frame, configuration, &left, &right, &top, &bottom))
+			return false;
+
+		*width -= (left + right);
+		*height -= (top + bottom);
+	}
+
+	/* constrain content dimensions manually */
+	if (state_is_floating(configuration->window_state)) {
+		constrain_content_size(frame, width, height);
+	}
+
 	return true;
 }
 
@@ -833,9 +808,17 @@ libdecor_frame_translate_coordinate(struct libdecor_frame *frame,
 	struct libdecor *context = frame_priv->context;
 	struct libdecor_plugin *plugin = context->plugin;
 
-	plugin->priv->iface->frame_translate_coordinate(plugin, frame,
-							content_x, content_y,
-							frame_x, frame_y);
+	*frame_x = content_x;
+	*frame_y = content_y;
+
+	if (frame_has_visible_client_side_decoration(frame) &&
+	    plugin->priv->iface->frame_get_border_size) {
+		int left, top;
+		plugin->priv->iface->frame_get_border_size(plugin, frame, NULL,
+							   &left, NULL, &top, NULL);
+		*frame_x += left;
+		*frame_y += top;
+	}
 }
 
 LIBDECOR_EXPORT void
