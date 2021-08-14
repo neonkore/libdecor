@@ -261,6 +261,23 @@ frame_get_window_size_for(struct libdecor_frame *frame,
 	return true;
 }
 
+static void
+frame_set_window_geometry(struct libdecor_frame *frame,
+			  int32_t content_width, int32_t content_height)
+{
+	struct libdecor_plugin *plugin = frame->priv->context->plugin;
+	int x, y, width, height;
+	int left, right, top, bottom;
+
+	plugin->priv->iface->frame_get_border_size(plugin, frame, NULL,
+						   &left, &right, &top, &bottom);
+	x = -left;
+	y = -top;
+	width = content_width + left + right;
+	height = content_height + top + bottom;
+	xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
+}
+
 LIBDECOR_EXPORT bool
 libdecor_configuration_get_content_size(struct libdecor_configuration *configuration,
 					struct libdecor_frame *frame,
@@ -607,11 +624,11 @@ libdecor_frame_set_visibility(struct libdecor_frame *frame,
 	} else {
 		/* destroy client-side decorations */
 		plugin->priv->iface->frame_free(plugin, frame);
-
-		libdecor_frame_set_window_geometry(frame, 0, 0,
-						   frame_priv->content_width,
-						   frame_priv->content_height);
 	}
+
+	frame_set_window_geometry(frame,
+				  frame_priv->content_width,
+				  frame_priv->content_height);
 
 	libdecor_frame_toplevel_commit(frame);
 }
@@ -865,14 +882,6 @@ libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
 	*pcontent_height = frame_priv->state.content_limits.max_height;
 }
 
-LIBDECOR_EXPORT void
-libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
-				   int32_t x, int32_t y,
-				   int32_t width, int32_t height)
-{
-	xdg_surface_set_window_geometry(frame->priv->xdg_surface, x, y, width, height);
-}
-
 LIBDECOR_EXPORT enum libdecor_capabilities
 libdecor_frame_get_capabilities(const struct libdecor_frame *frame)
 {
@@ -1105,11 +1114,11 @@ libdecor_frame_commit(struct libdecor_frame *frame,
 						  configuration);
 	} else {
 		plugin->priv->iface->frame_free(plugin, frame);
-
-		libdecor_frame_set_window_geometry(frame, 0, 0,
-						   frame_priv->content_width,
-						   frame_priv->content_height);
 	}
+
+	frame_set_window_geometry(frame,
+				  frame_priv->content_width,
+				  frame_priv->content_height);
 
 	if (configuration) {
 		xdg_surface_ack_configure(frame_priv->xdg_surface,

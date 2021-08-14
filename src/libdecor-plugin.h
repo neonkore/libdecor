@@ -137,11 +137,6 @@ libdecor_frame_get_content_height(struct libdecor_frame *frame);
 enum libdecor_window_state
 libdecor_frame_get_window_state(struct libdecor_frame *frame);
 
-void
-libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
-				   int32_t x, int32_t y,
-				   int32_t width, int32_t height);
-
 enum libdecor_capabilities
 libdecor_frame_get_capabilities(const struct libdecor_frame *frame);
 

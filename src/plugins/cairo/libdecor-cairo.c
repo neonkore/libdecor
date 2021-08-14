@@ -1662,32 +1662,6 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 	}
 }
 
-static void
-set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
-{
-	struct libdecor_frame *frame = &frame_cairo->frame;
-	int x = 0, y = 0, width = 0, height = 0;
-
-	switch (frame_cairo->decoration_type) {
-	case DECORATION_TYPE_NONE:
-		x = 0;
-		y = 0;
-		width = libdecor_frame_get_content_width(frame);
-		height = libdecor_frame_get_content_height(frame);
-		break;
-	case DECORATION_TYPE_ALL:
-	case DECORATION_TYPE_TILED:
-	case DECORATION_TYPE_MAXIMIZED:
-		x = 0;
-		y = -(int)TITLE_HEIGHT;
-		width = libdecor_frame_get_content_width(frame);
-		height = libdecor_frame_get_content_height(frame) + TITLE_HEIGHT;
-		break;
-	}
-
-	libdecor_frame_set_window_geometry(frame, x, y, width, height);
-}
-
 static enum decoration_type
 window_state_to_decoration_type(enum libdecor_window_state window_state)
 {
@@ -1745,7 +1719,6 @@ libdecor_plugin_cairo_frame_commit(struct libdecor_plugin *plugin,
 	frame_cairo->window_state = new_window_state;
 
 	draw_decoration(frame_cairo);
-	set_window_geometry(frame_cairo);
 }
 
 static void
