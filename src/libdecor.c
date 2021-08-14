@@ -1260,6 +1260,12 @@ registry_handle_global(void *user_data,
 	if (!strcmp(interface, xdg_wm_base_interface.name)) {
 		init_xdg_wm_base(context, id, version);
 	} else if (!strcmp(interface, zxdg_decoration_manager_v1_interface.name)) {
+		const char *force_csd = getenv("LIBDECOR_FORCE_CSD");
+
+		if (force_csd && atoi(force_csd)) {
+			return;
+		}
+
 		context->decoration_manager = wl_registry_bind(
 				context->wl_registry, id,
 				&zxdg_decoration_manager_v1_interface,
