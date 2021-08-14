@@ -1930,6 +1930,44 @@ libdecor_plugin_cairo_frame_get_window_size_for(
 	return true;
 }
 
+static bool
+libdecor_plugin_cairo_frame_get_border_size(struct libdecor_plugin *plugin,
+					    struct libdecor_frame *frame,
+					    struct libdecor_configuration *configuration,
+					    int *left,
+					    int *right,
+					    int *top,
+					    int *bottom)
+{
+	enum libdecor_window_state window_state;
+
+	if (configuration) {
+		if (!libdecor_configuration_get_window_state(
+			    configuration, &window_state))
+			return false;
+	} else {
+		window_state = libdecor_frame_get_window_state(frame);
+	}
+
+	if (left)
+		*left = 0;
+	if (right)
+		*right = 0;
+	if (bottom)
+		*bottom = 0;
+	if (top) {
+		enum decoration_type type = window_state_to_decoration_type(window_state);
+
+		if (((struct libdecor_frame_cairo *)frame)->title_bar.is_showing &&
+		    (type != DECORATION_TYPE_NONE))
+			*top = TITLE_HEIGHT;
+		else
+			*top = 0;
+	}
+
+	return true;
+}
+
 static struct libdecor_plugin_interface cairo_plugin_iface = {
 	.destroy = libdecor_plugin_cairo_destroy,
 	.get_fd = libdecor_plugin_cairo_get_fd,
@@ -1948,6 +1986,7 @@ static struct libdecor_plugin_interface cairo_plugin_iface = {
 			libdecor_plugin_cairo_configuration_get_content_size,
 	.frame_get_window_size_for =
 			libdecor_plugin_cairo_frame_get_window_size_for,
+	.frame_get_border_size = libdecor_plugin_cairo_frame_get_border_size,
 };
 
 static void

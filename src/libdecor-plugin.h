@@ -122,6 +122,14 @@ struct libdecor_plugin_interface {
 						int *content_width,
 						int *content_height);
 
+	bool (* frame_get_border_size)(struct libdecor_plugin *plugin,
+				       struct libdecor_frame *frame,
+				       struct libdecor_configuration *configuration,
+				       int *left,
+				       int *right,
+				       int *top,
+				       int *bottom);
+
 	/* Reserved */
 	void (* reserved0)(void);
 	void (* reserved1)(void);
