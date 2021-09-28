@@ -577,6 +577,8 @@ libdecor_frame_unref(struct libdecor_frame *frame)
 		struct libdecor *context = frame_priv->context;
 		struct libdecor_plugin *plugin = context->plugin;
 
+		wl_list_remove(&frame->link);
+
 		if (frame_priv->xdg_toplevel)
 			xdg_toplevel_destroy(frame_priv->xdg_toplevel);
 		if (frame_priv->xdg_surface)
