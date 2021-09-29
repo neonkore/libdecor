@@ -51,7 +51,7 @@ dbus_dep = dependency('dbus-1', version: dbus_req, required: get_option('dbus'))
 # list of (function, prefix)
 required_functions = [
   ['memfd_create', '#define _GNU_SOURCE\n#include <sys/mman.h>'],
-  ['posix_fallocate', '#include <fcntl.h>'],
+  ['posix_fallocate', '#define _GNU_SOURCE\n#include <fcntl.h>'],
   ['asprintf', '#define _GNU_SOURCE\n#include <stdio.h>'],
 ]
 foreach function : required_functions
