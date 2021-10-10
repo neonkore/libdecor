@@ -133,13 +133,13 @@ os_resize_anonymous_file(int fd, off_t size)
 int
 os_create_anonymous_file(off_t size)
 {
-	static const char template[] = "/wayland-cursor-shared-XXXXXX";
+	static const char template[] = "/libdecor-shared-XXXXXX";
 	const char *path;
 	char *name;
 	int fd;
 
 #ifdef HAVE_MEMFD_CREATE
-	fd = memfd_create("wayland-cursor", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+	fd = memfd_create("libdecor", MFD_CLOEXEC | MFD_ALLOW_SEALING);
 	if (fd >= 0) {
 		/* We can add this seal before calling posix_fallocate(), as
 		 * the file is currently zero-sized anyway.
