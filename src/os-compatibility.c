@@ -82,6 +82,26 @@ create_tmpfile_cloexec(char *tmpname)
 	return fd;
 }
 
+static int
+os_resize_anonymous_file(int fd, off_t size)
+{
+#ifdef HAVE_POSIX_FALLOCATE
+	/* 
+	 * Filesystems that do support fallocate will return EINVAL or
+	 * EOPNOTSUPP. In this case we need to fall back to ftruncate
+	 */
+	errno = posix_fallocate(fd, 0, size);
+	if (errno == 0)
+		return 0;
+	else if (errno != EINVAL && errno != EOPNOTSUPP)
+		return -1;
+#endif
+	if (ftruncate(fd, size) < 0)
+		return -1;
+
+	return 0;
+}
+
 /*
  * Create a new, unique, anonymous file of the given size, and
  * return the file descriptor for it. The file descriptor is set
@@ -158,24 +178,4 @@ os_create_anonymous_file(off_t size)
 	}
 
 	return fd;
-}
-
-int
-os_resize_anonymous_file(int fd, off_t size)
-{
-#ifdef HAVE_POSIX_FALLOCATE
-	/* 
-	 * Filesystems that do support fallocate will return EINVAL or
-	 * EOPNOTSUPP. In this case we need to fall back to ftruncate
-	 */
-	errno = posix_fallocate(fd, 0, size);
-	if (errno == 0)
-		return 0;
-	else if (errno != EINVAL && errno != EOPNOTSUPP)
-		return -1;
-#endif
-	if (ftruncate(fd, size) < 0)
-		return -1;
-
-	return 0;
 }
