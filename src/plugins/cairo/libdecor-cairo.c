@@ -1134,10 +1134,16 @@ draw_title_text(struct libdecor_frame_cairo *frame_cairo,
 	double text_x, text_y;
 	double text_width, text_height;
 
+	const char *title;
+
+	title = libdecor_frame_get_title((struct libdecor_frame*) frame_cairo);
+	if (!title)
+		return;
+
 	layout = pango_cairo_create_layout(cr);
 
 	pango_layout_set_text(layout,
-			      libdecor_frame_get_title((struct libdecor_frame*) frame_cairo),
+			      title,
 			      -1);
 	pango_layout_set_font_description(layout, frame_cairo->plugin_cairo->font);
 	pango_layout_get_size(layout, &text_extents_width, &text_extents_height);
