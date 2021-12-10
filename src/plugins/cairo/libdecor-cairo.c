@@ -2702,8 +2702,8 @@ output_removed(struct libdecor_plugin_cairo *plugin_cairo,
 		remove_surface_outputs(&frame_cairo->title_bar.close, output);
 	}
 	wl_list_for_each(seat, &plugin_cairo->seat_list, link) {
-		struct cursor_output *cursor_output;
-		wl_list_for_each(cursor_output, &seat->cursor_outputs, link) {
+		struct cursor_output *cursor_output, *tmp;
+		wl_list_for_each_safe(cursor_output, tmp, &seat->cursor_outputs, link) {
 			if (cursor_output->output == output) {
 				wl_list_remove(&cursor_output->link);
 				free(cursor_output);
