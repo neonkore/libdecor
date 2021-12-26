@@ -110,7 +110,8 @@ streql(const char *str1, const char *str2)
 enum decoration_type {
 	DECORATION_TYPE_NONE,
 	DECORATION_TYPE_ALL,
-	DECORATION_TYPE_TITLE_ONLY
+	DECORATION_TYPE_MAXIMIZED,
+	DECORATION_TYPE_TILED
 };
 
 enum component {
@@ -1255,14 +1256,15 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 	case NONE:
 		break;
 	case SHADOW:
-		render_shadow(cr,
-			      frame_cairo->shadow_blur,
-			      -(int)SHADOW_MARGIN/2,
-			      -(int)SHADOW_MARGIN/2,
-			      width + SHADOW_MARGIN,
-			      height + SHADOW_MARGIN,
-			      64,
-			      64);
+		if (frame_cairo->decoration_type != DECORATION_TYPE_TILED)
+			render_shadow(cr,
+				      frame_cairo->shadow_blur,
+				      -(int)SHADOW_MARGIN/2,
+				      -(int)SHADOW_MARGIN/2,
+				      width + SHADOW_MARGIN,
+				      height + SHADOW_MARGIN,
+				      64,
+				      64);
 		break;
 	case TITLE:
 		cairo_set_rgba32(cr, &col_title);
@@ -1651,6 +1653,7 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 		if (is_title_bar_surfaces_showing(frame_cairo))
 			hide_title_bar_surfaces(frame_cairo);
 		break;
+	case DECORATION_TYPE_TILED:
 	case DECORATION_TYPE_ALL:
 		/* show borders */
 		ensure_border_surfaces(frame_cairo);
@@ -1664,7 +1667,7 @@ draw_decoration(struct libdecor_frame_cairo *frame_cairo)
 				&frame_cairo->plugin_cairo->visible_frame_list,
 				&frame_cairo->link);
 		break;
-	case DECORATION_TYPE_TITLE_ONLY:
+	case DECORATION_TYPE_MAXIMIZED:
 		/* hide borders */
 		if (is_border_surfaces_showing(frame_cairo))
 			hide_border_surfaces(frame_cairo);
@@ -1694,7 +1697,8 @@ set_window_geometry(struct libdecor_frame_cairo *frame_cairo)
 		height = libdecor_frame_get_content_height(frame);
 		break;
 	case DECORATION_TYPE_ALL:
-	case DECORATION_TYPE_TITLE_ONLY:
+	case DECORATION_TYPE_TILED:
+	case DECORATION_TYPE_MAXIMIZED:
 		x = 0;
 		y = -(int)TITLE_HEIGHT;
 		width = libdecor_frame_get_content_width(frame);
@@ -1710,13 +1714,15 @@ window_state_to_decoration_type(enum libdecor_window_state window_state)
 {
 	if (window_state & LIBDECOR_WINDOW_STATE_FULLSCREEN)
 		return DECORATION_TYPE_NONE;
-	else if (window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED ||
-		 window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
+	else if (window_state & LIBDECOR_WINDOW_STATE_MAXIMIZED)
+		/* title bar, no shadows */
+		return DECORATION_TYPE_MAXIMIZED;
+	else if (window_state & LIBDECOR_WINDOW_STATE_TILED_LEFT ||
 		 window_state & LIBDECOR_WINDOW_STATE_TILED_RIGHT ||
 		 window_state & LIBDECOR_WINDOW_STATE_TILED_TOP ||
 		 window_state & LIBDECOR_WINDOW_STATE_TILED_BOTTOM)
-		/* title bar, no shadows */
-		return DECORATION_TYPE_TITLE_ONLY;
+		/* title bar, invisible shadows */
+		return DECORATION_TYPE_TILED;
 	else
 		/* title bar, shadows */
 		return DECORATION_TYPE_ALL;
@@ -1907,7 +1913,8 @@ libdecor_plugin_cairo_configuration_get_content_size(
 		*content_height = win_height;
 		break;
 	case DECORATION_TYPE_ALL:
-	case DECORATION_TYPE_TITLE_ONLY:
+	case DECORATION_TYPE_TILED:
+	case DECORATION_TYPE_MAXIMIZED:
 		*content_width = win_width;
 		*content_height = win_height - TITLE_HEIGHT;
 		break;
@@ -1933,7 +1940,8 @@ libdecor_plugin_cairo_frame_get_window_size_for(
 		*window_height = libdecor_state_get_content_height(state);
 		break;
 	case DECORATION_TYPE_ALL:
-	case DECORATION_TYPE_TITLE_ONLY:
+	case DECORATION_TYPE_TILED:
+	case DECORATION_TYPE_MAXIMIZED:
 		*window_width = libdecor_state_get_content_width(state);
 		*window_height =
 			libdecor_state_get_content_height(state) + TITLE_HEIGHT;
