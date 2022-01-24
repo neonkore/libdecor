@@ -23,12 +23,13 @@ Optional
 - `egl` (to build EGL example)
 - `opengl`
 - `xkbcommon` (to build cairo demo)
+- `gtk+-3.0` (for GTK plugin)
 
 Install via apt:
-`sudo apt install meson libwayland-dev wayland-protocols libpango1.0-dev libdbus-1-dev libegl-dev libopengl-dev libxkbcommon-dev`
+`sudo apt install meson libwayland-dev wayland-protocols libpango1.0-dev libdbus-1-dev libegl-dev libopengl-dev libxkbcommon-dev libgtk-3-dev`
 
 Install via dnf:
-`sudo dnf install meson wayland-devel wayland-protocols-devel pango-devel dbus-devel mesa-libEGL-devel libglvnd-devel libxkbcommon-devel`
+`sudo dnf install meson wayland-devel wayland-protocols-devel pango-devel dbus-devel mesa-libEGL-devel libglvnd-devel libxkbcommon-devel gtk3-devel`
 
 Newer meson versions can be installed via pip: `pip3 install -U meson`.
 
