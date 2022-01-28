@@ -1368,13 +1368,15 @@ load_plugin_loader(struct libdecor *context,
 		   const char *path,
 		   const char *name)
 {
+	char *ext;
 	char *filename;
 	void *lib;
 	const struct libdecor_plugin_description *plugin_description;
 	int priority;
 	struct plugin_loader *plugin_loader;
 
-	if (!strstr(name, ".so"))
+	ext = strrchr(name, '.');
+	if (ext == NULL || strcmp(ext, ".so") != 0)
 		return NULL;
 
 	if (asprintf(&filename, "%s/%s", path, name) == -1)
