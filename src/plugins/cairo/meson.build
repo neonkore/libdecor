@@ -25,3 +25,5 @@ shared_module('decor-cairo',
   install_dir: join_paths(plugindir),
   install: true,
 )
+
+devenv.append('LIBDECOR_PLUGIN_DIR', meson.current_build_dir())

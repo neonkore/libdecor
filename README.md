@@ -37,8 +37,8 @@ Newer meson versions can be installed via pip: `pip3 install -U meson`.
 ### Quick Start
 
 To build and run the example program:
-1. `meson build && meson compile -C build`
-2. `LIBDECOR_PLUGIN_DIR=build/src/plugins/cairo/ ./build/demo/libdecor-demo`
+1. `meson build -Dinstall_demo=true && meson compile -C build`
+2. `meson devenv -C build libdecor-demo`
 
 ### Release Builds
 
@@ -55,14 +55,18 @@ Plugins will be installed into the same directory and from thereon will be selec
 ### Debug and Development Builds
 
 During development and when debugging, it is recommended to enable the AddressSanitizer and increase the warning level:
-1. `meson build -Db_sanitize=address -Dwarning_level=3`
+1. `meson build -Dinstall_demo=true -Db_sanitize=address -Dwarning_level=3`
 2. `meson compile -C build`
 
 You may have to install `libasan6` (apt) or `libasan` (dnf). Otherwise linking will fail.
 
 By default `libdecor` will look for plugins in the target directory of the installation. Therefore, when running the demos directly from the `build` directory, no plugins will be found and the fallback plugin without any decorations will be used.
 
-The search path for plugins can be overridden by the environment variable `LIBDECOR_PLUGIN_DIR`. To use the `cairo` plugin, point to the plugin directory:
+On Meson 0.58.0 and above, this can be corrected using `devenv`, i.e., to run the demo:
+
+`meson devenv -C build libdecor-demo`
+
+On older Meson versions, the search path for plugins can be overridden by the environment variable `LIBDECOR_PLUGIN_DIR`. To use the `cairo` plugin, point to the plugin directory:
 
 `export LIBDECOR_PLUGIN_DIR=build/src/plugins/cairo/`
 

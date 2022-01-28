@@ -60,6 +60,7 @@ endforeach
 
 prefix = get_option('prefix')
 libdir = join_paths(prefix, get_option('libdir'))
+devenv = environment()
 
 pkgname = meson.project_name()
 pkglibdir = join_paths(libdir, pkgname)
@@ -100,4 +101,8 @@ subdir('src')
 
 if get_option('demo')
   subdir('demo')
+endif
+
+if meson.version().version_compare('>=0.58.0')
+  meson.add_devenv(devenv)
 endif
