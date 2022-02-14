@@ -1197,6 +1197,7 @@ libdecor_plugin_init(struct libdecor_plugin *plugin,
 LIBDECOR_EXPORT void
 libdecor_plugin_release(struct libdecor_plugin *plugin)
 {
+	free(plugin->priv);
 }
 
 static void
