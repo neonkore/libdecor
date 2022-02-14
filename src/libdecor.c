@@ -1389,21 +1389,21 @@ load_plugin_loader(struct libdecor *context,
 
 	plugin_description = dlsym(lib, "libdecor_plugin_description");
 	if (!plugin_description) {
-		dlclose(lib);
 		fprintf(stderr,
 			"Failed to load plugin '%s': no plugin description symbol\n",
 			name);
+		dlclose(lib);
 		return NULL;
 	}
 
 	if (plugin_description->api_version != LIBDECOR_PLUGIN_API_VERSION) {
-		dlclose(lib);
 		fprintf(stderr,
 			"Plugin '%s' found, but it's incompatible "
 			"(expected API version %d, but got %d)\n",
 			name,
 			LIBDECOR_PLUGIN_API_VERSION,
 			plugin_description->api_version);
+		dlclose(lib);
 		return NULL;
 	}
 
@@ -1414,10 +1414,10 @@ load_plugin_loader(struct libdecor *context,
 
 	priority = calculate_priority(plugin_description);
 	if (priority == -1) {
-		dlclose(lib);
 		fprintf(stderr,
 			"Plugin '%s' found, but has an invalid description\n",
 			name);
+		dlclose(lib);
 		return NULL;
 	}
 
