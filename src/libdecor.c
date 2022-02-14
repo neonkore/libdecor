@@ -1440,42 +1440,51 @@ plugin_loader_higher_priority(struct plugin_loader *plugin_loader,
 static int
 init_plugins(struct libdecor *context)
 {
-	const char *plugin_dir;
+	const char *plugin_dir_env;
+	char *all_plugin_dirs;
+	char *plugin_dir;
+	char *saveptr;
 	DIR *dir;
 	struct wl_list plugin_loaders;
 	struct plugin_loader *plugin_loader, *tmp;
 	struct plugin_loader *best_plugin_loader;
 	struct libdecor_plugin *plugin;
 
-	plugin_dir = getenv("LIBDECOR_PLUGIN_DIR");
-	if (!plugin_dir)
-		plugin_dir = LIBDECOR_PLUGIN_DIR;
-
-	dir = opendir(plugin_dir);
-	if (!dir) {
-		fprintf(stderr, "Couldn't open plugin directory: %s\n",
-			strerror(errno));
-		return -1;
+	plugin_dir_env = getenv("LIBDECOR_PLUGIN_DIR");
+	if (!plugin_dir_env) {
+		plugin_dir_env = LIBDECOR_PLUGIN_DIR;
 	}
+	all_plugin_dirs = strdup(plugin_dir_env);
 
 	wl_list_init(&plugin_loaders);
-
-	while (true) {
-		struct dirent *de;
-		struct plugin_loader *plugin_loader;
-
-		de = readdir(dir);
-		if (!de)
-			break;
-
-		plugin_loader = load_plugin_loader(context, plugin_dir, de->d_name);
-		if (!plugin_loader)
+	plugin_dir = strtok_r(all_plugin_dirs, ":", &saveptr);
+	while (plugin_dir) {
+		dir = opendir(plugin_dir);
+		if (!dir) {
+			fprintf(stderr, "Couldn't open plugin directory: %s\n",
+				strerror(errno));
 			continue;
+		}
 
-		wl_list_insert(plugin_loaders.prev, &plugin_loader->link);
+		while (true) {
+			struct dirent *de;
+
+			de = readdir(dir);
+			if (!de)
+				break;
+
+			plugin_loader = load_plugin_loader(context, plugin_dir, de->d_name);
+			if (!plugin_loader)
+				continue;
+
+			wl_list_insert(plugin_loaders.prev, &plugin_loader->link);
+		}
+
+		closedir(dir);
+
+		plugin_dir = strtok_r(NULL, ":", &saveptr);
 	}
-
-	closedir(dir);
+	free(all_plugin_dirs);
 
 retry_next:
 	best_plugin_loader = NULL;
