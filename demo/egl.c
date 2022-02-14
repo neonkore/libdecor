@@ -219,6 +219,30 @@ setup(struct window *window)
 	return true;
 }
 
+static void
+cleanup(struct window *window)
+{
+	if (window->client->egl_display) {
+		eglMakeCurrent(window->client->egl_display, EGL_NO_SURFACE,
+			       EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	}
+	if (window->egl_surface) {
+		eglDestroySurface(window->client->egl_display, window->egl_surface);
+	}
+	if (window->egl_window) {
+		wl_egl_window_destroy(window->egl_window);
+	}
+	if (window->surface) {
+		wl_surface_destroy(window->surface);
+	}
+	if (window->client->egl_context) {
+		eglDestroyContext(window->client->egl_display, window->client->egl_context);
+	}
+	if (window->client->egl_display) {
+		eglTerminate(window->client->egl_display);
+	}
+}
+
 static float
 hue_to_channel(const float *const hue, const int n)
 {
@@ -265,7 +289,7 @@ int
 main(int argc, char *argv[])
 {
 	struct wl_registry *wl_registry;
-	struct libdecor *context;
+	struct libdecor *context = NULL;
 	struct window *window;
 	struct client *client;
 	int ret = EXIT_SUCCESS;
@@ -275,6 +299,7 @@ main(int argc, char *argv[])
 	client->display = wl_display_connect(NULL);
 	if (!client->display) {
 		fprintf(stderr, "No Wayland connection\n");
+		free(client);
 		return EXIT_FAILURE;
 	}
 
@@ -288,7 +313,9 @@ main(int argc, char *argv[])
 	window->configured = false;
 	window->floating_width = window->floating_height = default_size;
 
-	setup(window);
+	if (!setup(window)) {
+		goto out;
+	}
 
 	context = libdecor_new(client->display, &libdecor_interface);
 	window->frame = libdecor_decorate(context, window->surface,
@@ -317,6 +344,10 @@ main(int argc, char *argv[])
 	}
 
 out:
+	if (context) {
+		libdecor_unref(context);
+	}
+	cleanup(window);
 	free(window);
 	free(client);
 
