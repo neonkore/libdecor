@@ -861,6 +861,28 @@ libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
+libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
+				    int *pcontent_width,
+				    int *pcontent_height)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	*pcontent_width = frame_priv->state.content_limits.min_width;
+	*pcontent_height = frame_priv->state.content_limits.min_height;
+}
+
+LIBDECOR_EXPORT void
+libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
+				    int *pcontent_width,
+				    int *pcontent_height)
+{
+	struct libdecor_frame_private *frame_priv = frame->priv;
+
+	*pcontent_width = frame_priv->state.content_limits.max_width;
+	*pcontent_height = frame_priv->state.content_limits.max_height;
+}
+
+LIBDECOR_EXPORT void
 libdecor_frame_set_window_geometry(struct libdecor_frame *frame,
 				   int32_t x, int32_t y,
 				   int32_t width, int32_t height)

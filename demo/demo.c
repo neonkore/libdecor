@@ -1284,6 +1284,7 @@ main(int argc,
 	libdecor_frame_map(window->frame);
 
 	gettimeofday(&start, NULL);
+	libdecor_frame_set_min_content_size(window->frame, 15 * chk, 10 * chk);
 
 	while (libdecor_dispatch(context, timeout) >= 0) {
 		if (timed_quit) {

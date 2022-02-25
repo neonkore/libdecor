@@ -196,4 +196,20 @@ libdecor_plugin_init(struct libdecor_plugin *plugin,
 void
 libdecor_plugin_release(struct libdecor_plugin *plugin);
 
+/*
+ * Get the min content size as set before with libdecor_frame_set_min_content_size().
+ */
+void
+libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
+				    int *pcontent_width,
+				    int *pcontent_height);
+
+/*
+ * Get the max content size as set before with libdecor_frame_set_max_content_size().
+ */
+void
+libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
+				    int *pcontent_width,
+				    int *pcontent_height);
+
 #endif /* LIBDECOR_PLUGIN_H */
