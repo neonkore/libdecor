@@ -73,3 +73,14 @@ On older Meson versions, the search path for plugins can be overridden by the en
 and run the demo:
 
 `./build/demo/libdecor-demo`.
+
+
+### Code of Conduct
+
+libdecor follows the Contributor Covenant, found at:
+https://www.freedesktop.org/wiki/CodeOfConduct
+
+Please conduct yourself in a respectful and civilised manner when interacting
+with community members on mailing lists, IRC, or bug trackers. The community
+represents the project as a whole, and abusive or bullying behaviour is not
+tolerated by the project.
