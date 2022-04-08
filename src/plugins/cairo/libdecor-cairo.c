@@ -1001,10 +1001,10 @@ ensure_border_surfaces(struct libdecor_frame_cairo *frame_cairo)
 	frame_cairo->shadow.opaque = false;
 	ensure_component(frame_cairo, &frame_cairo->shadow);
 
-	libdecor_frame_get_min_content_size(&frame_cairo->frame, 
+	libdecor_frame_get_min_content_size(&frame_cairo->frame,
 					    &min_width, &min_height);
-	libdecor_frame_set_min_content_size(&frame_cairo->frame, 
-		MAX(min_width, (int)MAX(56, 4 * BUTTON_WIDTH)), 
+	libdecor_frame_set_min_content_size(&frame_cairo->frame,
+		MAX(min_width, (int)MAX(56, 4 * BUTTON_WIDTH)),
 		MAX(min_height, (int)MAX(56, TITLE_HEIGHT + 1)));
 }
 

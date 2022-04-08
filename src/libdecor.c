@@ -677,7 +677,7 @@ libdecor_frame_set_title(struct libdecor_frame *frame,
 			return;
 
 		xdg_toplevel_set_title(frame_priv->xdg_toplevel, title);
-	
+
 		plugin->priv->iface->frame_property_changed(plugin, frame);
 	}
 }
