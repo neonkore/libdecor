@@ -1327,8 +1327,7 @@ draw_component_content(struct libdecor_frame_cairo *frame_cairo,
 			cairo_rel_line_to(cr, small - 1, 0);
 			cairo_rel_line_to(cr, 0, small - 1);
 			cairo_line_to(cr, x + small - 1, y + small - 1);
-		}
-		else {
+		} else {
 			cairo_rectangle(cr, x, y, SYM_DIM - 1, SYM_DIM - 1);
 		}
 		cairo_stroke(cr);
