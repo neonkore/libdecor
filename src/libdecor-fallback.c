@@ -141,6 +141,20 @@ libdecor_plugin_fallback_frame_popup_ungrab(struct libdecor_plugin *plugin,
 {
 }
 
+static bool
+libdecor_plugin_fallback_frame_get_border_size(struct libdecor_plugin *plugin,
+					       struct libdecor_frame *frame,
+					       struct libdecor_configuration *configuration,
+					       int *left,
+					       int *right,
+					       int *top,
+					       int *bottom)
+{
+	*left = *right = *top = *bottom = 0;
+
+	return true;
+}
+
 static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.destroy = libdecor_plugin_fallback_destroy,
 	.get_fd = libdecor_plugin_fallback_get_fd,
@@ -151,6 +165,7 @@ static struct libdecor_plugin_interface fallback_plugin_iface = {
 	.frame_property_changed = libdecor_plugin_fallback_frame_property_changed,
 	.frame_popup_grab = libdecor_plugin_fallback_frame_popup_grab,
 	.frame_popup_ungrab = libdecor_plugin_fallback_frame_popup_ungrab,
+	.frame_get_border_size = libdecor_plugin_fallback_frame_get_border_size,
 };
 
 struct libdecor_plugin *
