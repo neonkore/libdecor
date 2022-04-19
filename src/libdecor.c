@@ -1486,25 +1486,26 @@ init_plugins(struct libdecor *context)
 		if (!dir) {
 			fprintf(stderr, "Couldn't open plugin directory: %s\n",
 				strerror(errno));
-			continue;
+		} else {
+
+			while (true) {
+				struct dirent *de;
+
+				de = readdir(dir);
+				if (!de)
+					break;
+
+				plugin_loader = load_plugin_loader(context, 
+								   plugin_dir,
+								   de->d_name);
+				if (!plugin_loader)
+					continue;
+
+				wl_list_insert(plugin_loaders.prev, &plugin_loader->link);
+			}
+
+			closedir(dir);
 		}
-
-		while (true) {
-			struct dirent *de;
-
-			de = readdir(dir);
-			if (!de)
-				break;
-
-			plugin_loader = load_plugin_loader(context, plugin_dir, de->d_name);
-			if (!plugin_loader)
-				continue;
-
-			wl_list_insert(plugin_loaders.prev, &plugin_loader->link);
-		}
-
-		closedir(dir);
-
 		plugin_dir = strtok_r(NULL, ":", &saveptr);
 	}
 	free(all_plugin_dirs);
