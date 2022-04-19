@@ -166,6 +166,27 @@ static void
 redraw(struct window *window);
 
 static void
+constrain_content_size(const struct libdecor_frame *frame,
+		       int *width,
+		       int *height)
+{
+	int min_width, min_height, max_width, max_height;
+
+	libdecor_frame_get_min_content_size(frame, &min_width, &min_height);
+	libdecor_frame_get_max_content_size(frame, &max_width, &max_height);
+
+	if (min_width > 0)
+		*width = MAX(min_width, *width);
+	if (max_width > 0)
+		*width = MIN(*width, max_width);
+
+	if (min_height > 0)
+		*height = MAX(min_height, *height);
+	if (max_height > 0)
+		*height = MIN(*height, max_height);
+}
+
+static void
 resize(struct window *window, int width, int height)
 {
 	struct libdecor_state *state;
@@ -174,6 +195,8 @@ resize(struct window *window, int width, int height)
 		printf("... ignoring in non-floating mode\n");
 		return;
 	}
+
+	constrain_content_size(window->frame, &width, &height);
 
 	/* commit changes to decorations */
 	state = libdecor_state_new(width, height);
