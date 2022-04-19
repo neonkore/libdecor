@@ -1495,7 +1495,7 @@ init_plugins(struct libdecor *context)
 				if (!de)
 					break;
 
-				plugin_loader = load_plugin_loader(context, 
+				plugin_loader = load_plugin_loader(context,
 								   plugin_dir,
 								   de->d_name);
 				if (!plugin_loader)

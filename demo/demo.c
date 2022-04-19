@@ -176,7 +176,7 @@ resize(struct window *window, int width, int height)
 	}
 
 	/* commit changes to decorations */
-	state = libdecor_state_new( width, height);
+	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(window->frame, state, NULL);
 	libdecor_state_free(state);
 	/* force redraw of content and commit */
