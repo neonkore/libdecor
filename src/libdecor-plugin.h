@@ -181,15 +181,15 @@ libdecor_plugin_release(struct libdecor_plugin *plugin);
  */
 void
 libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
-				    int *pcontent_width,
-				    int *pcontent_height);
+				    int *content_width,
+				    int *content_height);
 
 /*
  * Get the max content size as set before with libdecor_frame_set_max_content_size().
  */
 void
 libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
-				    int *pcontent_width,
-				    int *pcontent_height);
+				    int *content_width,
+				    int *content_height);
 
 #endif /* LIBDECOR_PLUGIN_H */

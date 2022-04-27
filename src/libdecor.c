@@ -862,24 +862,24 @@ libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 
 LIBDECOR_EXPORT void
 libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
-				    int *pcontent_width,
-				    int *pcontent_height)
+				    int *content_width,
+				    int *content_height)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
-	*pcontent_width = frame_priv->state.content_limits.min_width;
-	*pcontent_height = frame_priv->state.content_limits.min_height;
+	*content_width = frame_priv->state.content_limits.min_width;
+	*content_height = frame_priv->state.content_limits.min_height;
 }
 
 LIBDECOR_EXPORT void
 libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
-				    int *pcontent_width,
-				    int *pcontent_height)
+				    int *content_width,
+				    int *content_height)
 {
 	struct libdecor_frame_private *frame_priv = frame->priv;
 
-	*pcontent_width = frame_priv->state.content_limits.max_width;
-	*pcontent_height = frame_priv->state.content_limits.max_height;
+	*content_width = frame_priv->state.content_limits.max_width;
+	*content_height = frame_priv->state.content_limits.max_height;
 }
 
 LIBDECOR_EXPORT enum libdecor_capabilities
