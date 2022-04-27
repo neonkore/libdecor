@@ -347,22 +347,22 @@ libdecor_frame_translate_coordinate(struct libdecor_frame *frame,
 				    int *frame_y);
 
 /**
- * Set the max content size.
- *
- * This translates roughly to xdg_toplevel_set_max_size().
- */
-void
-libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
-				    int content_width,
-				    int content_height);
-
-/**
  * Set the min content size.
  *
  * This translates roughly to xdg_toplevel_set_min_size().
  */
 void
 libdecor_frame_set_min_content_size(struct libdecor_frame *frame,
+				    int content_width,
+				    int content_height);
+
+/**
+ * Set the max content size.
+ *
+ * This translates roughly to xdg_toplevel_set_max_size().
+ */
+void
+libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 				    int content_width,
 				    int content_height);
 
