@@ -367,6 +367,22 @@ libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 				    int content_height);
 
 /**
+ * Get the min content size.
+ */
+void
+libdecor_frame_get_min_content_size(const struct libdecor_frame *frame,
+				    int *content_width,
+				    int *content_height);
+
+/**
+ * Get the max content size.
+ */
+void
+libdecor_frame_get_max_content_size(const struct libdecor_frame *frame,
+				    int *content_width,
+				    int *content_height);
+
+/**
  * Initiate an interactive resize.
  *
  * This roughly translates to xdg_toplevel_resize().

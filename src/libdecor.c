@@ -861,7 +861,7 @@ libdecor_frame_set_max_content_size(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
+libdecor_frame_get_min_content_size(const struct libdecor_frame *frame,
 				    int *content_width,
 				    int *content_height)
 {
@@ -872,7 +872,7 @@ libdecor_frame_get_min_content_size(struct libdecor_frame *frame,
 }
 
 LIBDECOR_EXPORT void
-libdecor_frame_get_max_content_size(struct libdecor_frame *frame,
+libdecor_frame_get_max_content_size(const struct libdecor_frame *frame,
 				    int *content_width,
 				    int *content_height)
 {
