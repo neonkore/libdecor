@@ -341,7 +341,7 @@ handle_error(struct libdecor *context,
 }
 
 static struct libdecor_interface libdecor_iface = {
-	.error = handle_error,
+	handle_error,
 };
 
 int
