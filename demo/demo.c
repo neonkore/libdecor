@@ -1118,6 +1118,13 @@ handle_configure(struct libdecor_frame *frame,
 	enum libdecor_window_state window_state;
 	struct libdecor_state *state;
 
+	/* Update window state first for the correct calculations */
+	if (!libdecor_configuration_get_window_state(configuration,
+						     &window_state))
+		window_state = LIBDECOR_WINDOW_STATE_NONE;
+
+	window->window_state = window_state;
+
 	if (!libdecor_configuration_get_content_size(configuration, frame,
 						     &width, &height)) {
 		width = window->content_width;
@@ -1129,12 +1136,6 @@ handle_configure(struct libdecor_frame *frame,
 
 	window->configured_width = width;
 	window->configured_height = height;
-
-	if (!libdecor_configuration_get_window_state(configuration,
-						     &window_state))
-		window_state = LIBDECOR_WINDOW_STATE_NONE;
-
-	window->window_state = window_state;
 
 	state = libdecor_state_new(width, height);
 	libdecor_frame_commit(frame, state, configuration);
