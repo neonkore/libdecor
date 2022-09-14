@@ -2363,6 +2363,7 @@ pointer_button(void *data,
 		}
 		else if (state == WL_POINTER_BUTTON_STATE_RELEASED &&
 			 frame_cairo->grab) {
+			libdecor_frame_ref(&frame_cairo->frame);
 			if (frame_cairo->grab == frame_cairo->focus) {
 				switch (frame_cairo->active->type) {
 				case BUTTON_MIN:
@@ -2383,6 +2384,7 @@ pointer_button(void *data,
 			}
 			frame_cairo->grab = NULL;
 			sync_active_component(frame_cairo, seat);
+			libdecor_frame_unref(&frame_cairo->frame);
 		}
 	}
 	else if (button == BTN_RIGHT &&
