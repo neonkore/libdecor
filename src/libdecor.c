@@ -1384,6 +1384,24 @@ calculate_priority(const struct libdecor_plugin_description *plugin_description)
 	return -1;
 }
 
+static bool
+check_symbol_conflicts(const struct libdecor_plugin_description *plugin_description)
+{
+	char * const *symbol;
+
+	symbol = plugin_description->conflicting_symbols;
+	while (*symbol) {
+		dlerror();
+		dlsym (RTLD_DEFAULT, *symbol);
+		if (!dlerror())
+			return false;
+
+		symbol++;
+	}
+
+	return true;
+}
+
 static struct plugin_loader *
 load_plugin_loader(struct libdecor *context,
 		   const char *path,
@@ -1431,6 +1449,11 @@ load_plugin_loader(struct libdecor *context,
 	}
 
 	if (!(plugin_description->capabilities & LIBDECOR_PLUGIN_CAPABILITY_BASE)) {
+		dlclose(lib);
+		return NULL;
+	}
+
+	if (!check_symbol_conflicts(plugin_description)) {
 		dlclose(lib);
 		return NULL;
 	}

@@ -79,6 +79,9 @@ struct libdecor_plugin_description {
 
 	/* Vfunc used for constructing a plugin instance. */
 	libdecor_plugin_constructor constructor;
+
+	/* NULL terminated list of incompatible symbols. */
+	char *conflicting_symbols[1024];
 };
 
 struct libdecor_plugin_interface {
