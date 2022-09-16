@@ -78,10 +78,13 @@ struct libdecor_plugin_gtk4 {
 
 	int epoll_fd;
 
-	struct wl_registry *wl_registry;
-
 	struct {
 		struct wl_subcompositor *wl_subcompositor;
+		struct wl_display *wl_display;
+		struct wl_event_queue *wl_event_queue;
+		struct wl_registry *wl_registry;
+		bool plugin_queue_only;
+		bool prepared_to_read;
 	} client;
 
 	struct {
@@ -116,7 +119,7 @@ libdecor_plugin_gtk4_destroy(struct libdecor_plugin *plugin)
 	struct libdecor_plugin_gtk4 *plugin_gtk4 =
 		(struct libdecor_plugin_gtk4 *) plugin;
 
-	wl_registry_destroy(plugin_gtk4->wl_registry);
+	wl_registry_destroy(plugin_gtk4->client.wl_registry);
 
 	if (plugin_gtk4->epoll_fd > 0)
 		close(plugin_gtk4->epoll_fd);
@@ -142,22 +145,82 @@ dispatch_event_loop(void *data, int events, struct dispatch_state *state)
 	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
 	struct wl_event_loop *event_loop;
 
+	fprintf(stderr, ":::: %s:%d %s() - \n", __FILE__, __LINE__, __func__);
 	event_loop = wl_display_get_event_loop(plugin_gtk4->server.wl_display);
 	if (wl_event_loop_dispatch(event_loop, 0) != 0)
 		fprintf(stderr, ":::: %s:%d %s() - FAIL: %m\n", __FILE__, __LINE__, __func__);
 }
 
 static void
+prepare_client_display(struct libdecor_plugin_gtk4 *plugin_gtk4, struct dispatch_state *state)
+{
+	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
+	struct wl_event_queue *plugin_queue;
+
+	plugin_queue = plugin_gtk4->client.wl_event_queue;
+
+	while (true) {
+		int count;
+
+		if (wl_display_prepare_read_queue(wl_display, plugin_queue) != 0)
+			goto dispatch_pending;
+		fprintf(stderr, ":::: %s:%d %s() - prep #1\n", __FILE__, __LINE__, __func__);
+
+		if (!plugin_gtk4->client.plugin_queue_only) {
+			if (wl_display_prepare_read(wl_display) != 0) {
+				wl_display_cancel_read(wl_display);
+				fprintf(stderr, ":::: %s:%d %s() - .. cancel that\n", __FILE__, __LINE__, __func__);
+				goto dispatch_pending;
+			}
+		}
+		fprintf(stderr, ":::: %s:%d %s() - prep #2\n", __FILE__, __LINE__, __func__);
+
+		break;
+dispatch_pending:
+		fprintf(stderr, ":::: %s:%d %s() - dispatch plugin queue\n", __FILE__, __LINE__, __func__);
+		count = wl_display_dispatch_queue_pending(wl_display, plugin_queue);
+		if (count == -1) {
+			fprintf(stderr, ":::: %s:%d %s() - failure\n", __FILE__, __LINE__, __func__);
+			break;
+		}
+		state->dispatch_count += count;
+
+		if (!plugin_gtk4->client.plugin_queue_only) {
+			fprintf(stderr, ":::: %s:%d %s() - dispatch app queue\n", __FILE__, __LINE__, __func__);
+			count = wl_display_dispatch_pending(wl_display);
+			if (count == -1) {
+				fprintf(stderr, ":::: %s:%d %s() - failure\n", __FILE__, __LINE__, __func__);
+				break;
+			}
+			state->dispatch_count += count;
+		}
+	}
+
+	plugin_gtk4->client.prepared_to_read = true;
+}
+
+static void
 dispatch_client_display(void *data, int events, struct dispatch_state *state)
 {
 	struct libdecor_plugin_gtk4 *plugin_gtk4 = data;
-	struct wl_display *wl_display =
-		libdecor_get_wl_display(plugin_gtk4->context);
+	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
+	struct wl_event_queue *plugin_queue;
 
 	if (events & EPOLLIN) {
+		fprintf(stderr, ":::: %s:%d %s() - cancel -> read\n", __FILE__, __LINE__, __func__);
+		wl_display_cancel_read(wl_display);
 		wl_display_read_events(wl_display);
-		state->read_client_display = true;
+	} else {
+		fprintf(stderr, ":::: %s:%d %s() - cancel -> cancel\n", __FILE__, __LINE__, __func__);
+		wl_display_cancel_read(wl_display);
+		wl_display_cancel_read(wl_display);
 	}
+
+	plugin_gtk4->client.prepared_to_read = false;
+
+	plugin_queue = plugin_gtk4->client.wl_event_queue;
+	state->dispatch_count += wl_display_dispatch_queue_pending(wl_display,
+								   plugin_queue);
 	state->dispatch_count += wl_display_dispatch_pending(wl_display);
 }
 
@@ -167,24 +230,26 @@ libdecor_plugin_gtk4_dispatch(struct libdecor_plugin *plugin,
 {
 	struct libdecor_plugin_gtk4 *plugin_gtk4 =
 		(struct libdecor_plugin_gtk4 *) plugin;
-	struct wl_display *wl_display =
-		libdecor_get_wl_display(plugin_gtk4->context);
-	struct epoll_event ep[16];
+	struct wl_display *wl_display = libdecor_get_wl_display(plugin_gtk4->context);
+	struct epoll_event ep[16] = {};
 	//struct pollfd fds[1];
 	//int ret;
-	int count, i;
+	int count;
+	int i;
 	//int dispatch_count = 0;
 	struct dispatch_state state = {};
 
-	while (wl_display_prepare_read(wl_display) != 0)
-		state.dispatch_count += wl_display_dispatch_pending(wl_display);
+	fprintf(stderr, ":::: %s:%d %s() - #v#v#v#v#\n", __FILE__, __LINE__, __func__);
 
-	wl_display_flush_clients (plugin_gtk4->server.wl_display);
+	prepare_client_display(plugin_gtk4, &state);
+
+	wl_display_flush_clients(plugin_gtk4->server.wl_display);
 	// todo handle error
 
 	if (wl_display_flush(wl_display) < 0 &&
 	    errno != EAGAIN) {
-		wl_display_cancel_read(wl_display);
+		fprintf(stderr, ":::: %s:%d %s() - flush failed, something is broken\n", __FILE__, __LINE__, __func__);
+		abort();
 		return -errno;
 	}
 
@@ -192,38 +257,32 @@ libdecor_plugin_gtk4_dispatch(struct libdecor_plugin *plugin,
 	for (i = 0; i < count; i++) {
 		struct dispatcher *dispatcher = ep[i].data.ptr;
 
+		fprintf(stderr, ":::: %s:%d %s() - vv dispatch\n", __FILE__, __LINE__, __func__);
 		dispatcher->dispatch(dispatcher->user_data, ep[i].events, &state);
+		fprintf(stderr, ":::: %s:%d %s() - ^^ dispatch\n", __FILE__, __LINE__, __func__);
 	}
 
-
-	if (!state.read_client_display)
+	if (plugin_gtk4->client.prepared_to_read) {
+		fprintf(stderr, ":::: %s:%d %s() - 2 x cancel\n", __FILE__, __LINE__, __func__);
 		wl_display_cancel_read(wl_display);
-
-	return state.dispatch_count;
-
-
-#if 0
-	fds[0] = (struct pollfd) { wl_display_get_fd(wl_display), POLLIN };
-
-
-	ret = poll(fds, ARRAY_SIZE (fds), timeout);
-	if (ret > 0) {
-		if (fds[0].revents & POLLIN) {
-			wl_display_read_events(wl_display);
-			dispatch_count += wl_display_dispatch_pending(wl_display);
-			return dispatch_count;
-		} else {
+		if (!plugin_gtk4->client.plugin_queue_only)
 			wl_display_cancel_read(wl_display);
-			return dispatch_count;
-		}
-	} else if (ret == 0) {
-		wl_display_cancel_read(wl_display);
-		return dispatch_count;
-	} else {
-		wl_display_cancel_read(wl_display);
-		return -errno;
 	}
-#endif
+	else
+		fprintf(stderr, ":::: %s:%d %s() - didn't prep or already read/cancelled\n", __FILE__, __LINE__, __func__);
+
+	plugin_gtk4->client.prepared_to_read = false;
+
+	fprintf(stderr, ":::: %s:%d %s() - #^#^#^#^#\n", __FILE__, __LINE__, __func__);
+	return state.dispatch_count;
+}
+
+static void
+dispatch_plugin_only(struct libdecor_plugin_gtk4 *plugin_gtk4)
+{
+	//plugin_gtk4->client.plugin_queue_only = true;
+	libdecor_plugin_gtk4_dispatch(&plugin_gtk4->plugin, -1);
+	plugin_gtk4->client.plugin_queue_only = false;
 }
 
 static struct libdecor_frame_gtk4 *
@@ -725,8 +784,9 @@ libdecor_shell_handle_create_frame(struct wl_client *wl_client,
 	xdg_toplevel_send_configure(frame_surface->xdg_toplevel_resource,
 				    480, 358, &states);
 	wl_array_release(&states);
+	static uint32_t s;// todo clean up
 	xdg_surface_send_configure(frame_surface->xdg_surface_resource,
-				   wl_display_next_serial(plugin_gtk4->server.wl_display));
+				   ++s);
 
 	libdecor_frame_toplevel_commit(frame);
 }
@@ -753,11 +813,10 @@ bind_libdecor_shell(struct wl_client *client,
 static bool
 init_compositor(struct libdecor_plugin_gtk4 *plugin_gtk4)
 {
-	struct wl_display *wl_display =
-		libdecor_get_wl_display(plugin_gtk4->context);
+	struct wl_display *wl_display = plugin_gtk4->client.wl_display;
 
-	plugin_gtk4->wl_registry = wl_display_get_registry(wl_display);
-	wl_registry_add_listener(plugin_gtk4->wl_registry,
+	plugin_gtk4->client.wl_registry = wl_display_get_registry(wl_display);
+	wl_registry_add_listener(plugin_gtk4->client.wl_registry,
 				 &registry_listener,
 				 plugin_gtk4);
 
@@ -772,7 +831,8 @@ init_compositor(struct libdecor_plugin_gtk4 *plugin_gtk4)
 				 LIBDECOR_SHELL_VERSION,
 				 plugin_gtk4, bind_libdecor_shell);
 
-	wl_display_roundtrip(wl_display);
+	wl_display_roundtrip_queue(libdecor_get_wl_display(plugin_gtk4->context),
+				   plugin_gtk4->client.wl_event_queue);
 	return true;
 }
 
@@ -911,8 +971,7 @@ display_sync_handler(struct wl_display *wl_display,
 		     void *user_data)
 {
 	struct libdecor_plugin_gtk4 *plugin_gtk4 = user_data;
-	struct wl_display *client_wl_display =
-		libdecor_get_wl_display(plugin_gtk4->context);
+	struct wl_display *client_wl_display = plugin_gtk4->client.wl_display;
 	struct wl_callback *proxy;
 
 	proxy = wl_display_sync(client_wl_display);
@@ -924,7 +983,6 @@ display_sync_handler(struct wl_display *wl_display,
 static struct libdecor_plugin *
 libdecor_plugin_new(struct libdecor *context)
 {
-	struct wl_display *client_wl_display = libdecor_get_wl_display(context);
 	struct libdecor_plugin_gtk4 *plugin_gtk4;
 	struct wl_event_loop *event_loop;
 	int fd;
@@ -937,6 +995,13 @@ libdecor_plugin_new(struct libdecor *context)
 			     context,
 			     &gtk4_plugin_iface);
 	plugin_gtk4->context = context;
+
+	plugin_gtk4->client.wl_display =
+		wl_proxy_create_wrapper(libdecor_get_wl_display(context));
+	plugin_gtk4->client.wl_event_queue =
+		wl_display_create_queue(libdecor_get_wl_display(context));
+	wl_proxy_set_queue((struct wl_proxy *) plugin_gtk4->client.wl_display,
+			   plugin_gtk4->client.wl_event_queue);
 
 	plugin_gtk4->epoll_fd = os_epoll_create_cloexec();
 	if (plugin_gtk4->epoll_fd < 0) {
@@ -963,10 +1028,11 @@ libdecor_plugin_new(struct libdecor *context)
 	ep.events = EPOLLIN;
 	ep.data.ptr = client_display_dispatcher; // todo free
 	epoll_ctl(plugin_gtk4->epoll_fd, EPOLL_CTL_ADD,
-		  wl_display_get_fd(client_wl_display), &ep);
+		  wl_display_get_fd(libdecor_get_wl_display(plugin_gtk4->context)),
+		  &ep);
 
 	plugin_gtk4->tunnels =
-		libdecor_gtk4_tunnels_new(client_wl_display,
+		libdecor_gtk4_tunnels_new(plugin_gtk4->client.wl_display,
 					  plugin_gtk4->server.wl_display);
 	init_compositor(plugin_gtk4);
 	wl_list_init(&plugin_gtk4->pending_frames);
@@ -979,7 +1045,7 @@ libdecor_plugin_new(struct libdecor *context)
 
 	while (!plugin_gtk4->shell.resource) {
 		// ^^ needs to handle client failing
-		libdecor_plugin_gtk4_dispatch(&plugin_gtk4->plugin, -1);
+		dispatch_plugin_only(plugin_gtk4);
 	}
 	fprintf(stderr, ":::: %s:%d %s() - initialized\n", __FILE__, __LINE__, __func__);
 

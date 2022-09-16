@@ -116,5 +116,6 @@ main(int argc, char **argv) {
 
 	loop = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(loop);
+	fprintf(stderr, ":::: %s:%d %s() - exiting\n", __FILE__, __LINE__, __func__);
 	return EXIT_SUCCESS;
 }

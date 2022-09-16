@@ -1311,6 +1311,7 @@ libdecor_gtk4_tunnels_new(struct wl_display *client_wl_display,
 			  struct wl_display *server_wl_display)
 {
 	struct libdecor_gtk4_tunnels *tunnels;
+	struct wl_proxy *proxy;
 
 	tunnels = zalloc(sizeof *tunnels);
 	tunnels->client.wl_display = client_wl_display;
