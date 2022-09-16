@@ -7,6 +7,14 @@ project('libdecor', 'c',
   ],
 )
 
+cc = meson.get_compiler('c')
+add_project_link_arguments(
+  cc.get_supported_link_arguments(
+    '-Wl,--disable-new-dtags',
+  ),
+  language : 'c',
+)
+
 version_array = meson.project_version().split('.')
 libdecor_major_version = version_array[0].to_int()
 libdecor_minor_version = version_array[1].to_int()

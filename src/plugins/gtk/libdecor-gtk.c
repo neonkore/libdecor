@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <dlfcn.h>
 #include <linux/input.h>
 #include <fcntl.h>
 #include <string.h>
@@ -2596,4 +2597,8 @@ libdecor_plugin_description = {
 	.description = "GTK3 plugin",
 	.priorities = priorities,
 	.constructor = libdecor_plugin_new,
+	//.conflicting_symbols = {
+		//"png_free",
+		//NULL,
+	//},
 };

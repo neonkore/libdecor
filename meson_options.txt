@@ -5,3 +5,5 @@ option('dbus', type: 'feature', value: 'enabled', description: 'use D-Bus to fet
 option('install_demo', type: 'boolean', value: false, description: 'install demo programs')
 
 option('gtk', type: 'feature', value: 'enabled', description: 'build GTK plugin')
+
+option('gtk4', type: 'feature', value: 'enabled', description: 'build GTK4 plugin')

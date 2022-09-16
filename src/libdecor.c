@@ -1528,6 +1528,7 @@ retry_next:
 		return -1;
 
 	plugin_loader = best_plugin_loader;
+
 	plugin = plugin_loader->description->constructor(context);
 	if (!plugin) {
 		fprintf(stderr,
@@ -1661,4 +1662,10 @@ libdecor_new(struct wl_display *wl_display,
 	wl_display_flush(wl_display);
 
 	return context;
+}
+
+LIBDECOR_EXPORT struct wl_list *
+libdecor_get_frames(struct libdecor *context)
+{
+	return &context->frames;
 }

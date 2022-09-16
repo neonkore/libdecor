@@ -177,4 +177,7 @@ libdecor_plugin_init(struct libdecor_plugin *plugin,
 void
 libdecor_plugin_release(struct libdecor_plugin *plugin);
 
+struct wl_list *
+libdecor_get_frames(struct libdecor *context);
+
 #endif /* LIBDECOR_PLUGIN_H */

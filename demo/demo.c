@@ -75,7 +75,7 @@ static const size_t N_TITLES = ARRAY_SIZE(titles);
 static bool
 own_proxy(struct wl_proxy *proxy)
 {
-	return (wl_proxy_get_tag(proxy) == &proxy_tag);
+	return proxy && (wl_proxy_get_tag(proxy) == &proxy_tag);
 }
 
 static bool
@@ -1117,6 +1117,7 @@ handle_configure(struct libdecor_frame *frame,
 	int width, height;
 	enum libdecor_window_state window_state;
 	struct libdecor_state *state;
+	bool should_redraw = false;
 
 	if (!libdecor_configuration_get_content_size(configuration, frame,
 						     &width, &height)) {
@@ -1127,12 +1128,19 @@ handle_configure(struct libdecor_frame *frame,
 	width = (width == 0) ? window->floating_width : width;
 	height = (height == 0) ? window->floating_height : height;
 
+	if (window->configured_width != width ||
+	    window->configured_height != height)
+		should_redraw = true;
+
 	window->configured_width = width;
 	window->configured_height = height;
 
 	if (!libdecor_configuration_get_window_state(configuration,
 						     &window_state))
 		window_state = LIBDECOR_WINDOW_STATE_NONE;
+
+	if (window->window_state != window_state)
+		should_redraw = true;
 
 	window->window_state = window_state;
 
@@ -1146,7 +1154,10 @@ handle_configure(struct libdecor_frame *frame,
 		window->floating_height = height;
 	}
 
-	redraw(window);
+	if (should_redraw)
+		redraw(window);
+	else
+		wl_surface_commit(window->wl_surface);
 }
 
 static void

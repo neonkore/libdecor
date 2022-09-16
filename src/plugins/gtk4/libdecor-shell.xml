@@ -1,0 +1,31 @@
+<protocol name="libdecor_gtk4">
+
+  <interface name="libdecor_shell" version="1">
+    <event name="request_frame">
+      <arg name="serial" type="uint"/>
+    </event>
+
+    <request name="create_frame">
+      <arg name="frame_surface" type="new_id" interface="frame_surface"/>
+      <arg name="serial" type="uint"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+    </request>
+  </interface>
+
+  <interface name="frame_surface" version="1">
+    <request name="destroy" type="destructor"/>
+
+    <request name="set_content_area">
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+      
+    <event name="configure">
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+  </interface>
+
+</protocol>

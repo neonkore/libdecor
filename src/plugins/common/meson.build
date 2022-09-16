@@ -11,3 +11,21 @@ plugin_common = static_library('cairo-blur',
   ],
   install: false,
 )
+
+os_utils = static_library('os-utils',
+  sources: [
+    'libdecor-os-utils.c',
+    'libdecor-process-utils.c',
+  ],
+  include_directories: [
+    top_includepath,
+    libdecor_includepath,
+  ],
+  dependencies: [
+  ],
+  install: false,
+)
+
+os_utils_dep = declare_dependency(
+  link_with: os_utils,
+)
