@@ -207,6 +207,13 @@ private:
 		enum libdecor_window_state window_state;
 		struct libdecor_state *state;
 
+		/* Update window state first for the correct calculations */
+		if (!libdecor_configuration_get_window_state(configuration,
+							     &window_state))
+			window_state = LIBDECOR_WINDOW_STATE_NONE;
+
+		this->window_state = window_state;
+
 		libdecor_configuration_get_content_size(configuration, frame,
 							&width, &height);
 
@@ -215,12 +222,6 @@ private:
 
 		this->configured_width = width;
 		this->configured_height = height;
-
-		if (!libdecor_configuration_get_window_state(configuration,
-							     &window_state))
-			window_state = LIBDECOR_WINDOW_STATE_NONE;
-
-		this->window_state = window_state;
 
 		state = libdecor_state_new(width, height);
 		libdecor_frame_commit(frame, state, configuration);
