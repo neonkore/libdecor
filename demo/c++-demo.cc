@@ -257,7 +257,7 @@ private:
 	}
 
 	static void handle_commit(struct libdecor_frame *frame,
-			          void *user_data)
+				  void *user_data)
 	{
 		Window *window = reinterpret_cast<Window *>(user_data);
 
