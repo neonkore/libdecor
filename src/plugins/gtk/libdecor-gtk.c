@@ -659,6 +659,7 @@ libdecor_plugin_gtk_frame_free(struct libdecor_plugin *plugin,
 	/* when in SSD mode, frame_gtk->header is not a proper GTK widget */
 	if (!GTK_IS_WIDGET(frame_gtk->header)) return;
 	gtk_widget_destroy(frame_gtk->header);
+	if (!GTK_IS_WIDGET(frame_gtk->window)) return;
 	gtk_widget_destroy(frame_gtk->window);
 
 	free_border_component(&frame_gtk->headerbar);
