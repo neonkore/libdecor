@@ -23,3 +23,7 @@ shared_module('decor-gtk',
   install_dir: join_paths(plugindir),
   install: true,
 )
+
+if meson.version().version_compare('>=0.58.0')
+  devenv.append('LIBDECOR_PLUGIN_DIR', meson.current_build_dir())
+endif
