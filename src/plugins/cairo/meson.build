@@ -23,4 +23,6 @@ shared_module('decor-cairo',
   install: true,
 )
 
-devenv.append('LIBDECOR_PLUGIN_DIR', meson.current_build_dir())
+if meson.version().version_compare('>=0.58.0')
+  devenv.append('LIBDECOR_PLUGIN_DIR', meson.current_build_dir())
+endif
