@@ -109,6 +109,9 @@ libdecor = shared_library(libdecor_name,
 
 libdecor_dep = declare_dependency(
   link_with: libdecor,
+  include_directories: [
+    libdecor_includepath,
+  ],
   dependencies: [
     wayland_client_dep,
   ],

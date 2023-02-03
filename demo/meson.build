@@ -40,7 +40,6 @@ executable('libdecor-demo',
   ],
   include_directories: [
     top_includepath,
-    libdecor_includepath,
   ],
   dependencies: [
     libdecor_dep,
@@ -53,7 +52,6 @@ executable('libdecor-demo',
 
 executable('libdecor-egl',
   sources: 'egl.c',
-  include_directories: libdecor_includepath,
   dependencies: [
     libdecor_dep,
     wayland_egl_dep,
@@ -73,7 +71,6 @@ executable('libdecor-c++-demo',
   ],
   include_directories: [
     top_includepath,
-    libdecor_includepath,
   ],
   dependencies: [
     libdecor_dep,
