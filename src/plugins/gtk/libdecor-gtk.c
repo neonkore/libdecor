@@ -33,6 +33,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <wayland-client-core.h>
 #include <wayland-cursor.h>
 
 #include "libdecor-plugin.h"
@@ -2583,6 +2584,7 @@ libdecor_plugin_new(struct libdecor *context)
 	wl_callback_add_listener(plugin_gtk->globals_callback,
 				 &globals_callback_listener,
 				 plugin_gtk);
+	wl_display_roundtrip(wl_display);
 
 	/* setup GTK context */
 	gdk_set_allowed_backends("wayland");

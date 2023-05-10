@@ -2734,6 +2734,7 @@ libdecor_plugin_new(struct libdecor *context)
 	wl_callback_add_listener(plugin_cairo->globals_callback,
 				 &globals_callback_listener,
 				 plugin_cairo);
+	wl_display_roundtrip(wl_display);
 
 	return &plugin_cairo->plugin;
 }
