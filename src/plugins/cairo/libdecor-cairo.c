@@ -2682,13 +2682,6 @@ globals_callback(void *user_data,
 
 	wl_callback_destroy(callback);
 	plugin_cairo->globals_callback = NULL;
-
-	if (!has_required_globals(plugin_cairo)) {
-		libdecor_notify_plugin_error(
-				plugin_cairo->context,
-				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-				"Compositor is missing required globals");
-	}
 }
 
 static const struct wl_callback_listener globals_callback_listener = {
@@ -2735,6 +2728,12 @@ libdecor_plugin_new(struct libdecor *context)
 				 &globals_callback_listener,
 				 plugin_cairo);
 	wl_display_roundtrip(wl_display);
+
+	if (!has_required_globals(plugin_cairo)) {
+		fprintf(stderr, "libdecor-cairo-WARNING: Could not get required globals\n");
+		libdecor_plugin_cairo_destroy(&plugin_cairo->plugin);
+		return NULL;
+	}
 
 	return &plugin_cairo->plugin;
 }

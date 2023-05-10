@@ -2536,15 +2536,6 @@ globals_callback(void *user_data,
 
 	wl_callback_destroy(callback);
 	plugin_gtk->globals_callback = NULL;
-
-	if (!has_required_globals(plugin_gtk)) {
-		struct libdecor *context = plugin_gtk->context;
-
-		libdecor_notify_plugin_error(
-				context,
-				LIBDECOR_ERROR_COMPOSITOR_INCOMPATIBLE,
-				"Compositor is missing required globals");
-	}
 }
 
 static const struct wl_callback_listener globals_callback_listener = {
@@ -2585,6 +2576,12 @@ libdecor_plugin_new(struct libdecor *context)
 				 &globals_callback_listener,
 				 plugin_gtk);
 	wl_display_roundtrip(wl_display);
+
+	if (!has_required_globals(plugin_gtk)) {
+		fprintf(stderr, "libdecor-gtk-WARNING: Could not get required globals\n");
+		libdecor_plugin_gtk_destroy(&plugin_gtk->plugin);
+		return NULL;
+	}
 
 	/* setup GTK context */
 	gdk_set_allowed_backends("wayland");
