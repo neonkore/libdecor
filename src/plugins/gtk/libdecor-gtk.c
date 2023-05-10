@@ -427,10 +427,13 @@ libdecor_plugin_gtk_destroy(struct libdecor_plugin *plugin)
 
 	free(plugin_gtk->cursor_theme_name);
 
-	wl_shm_destroy(plugin_gtk->wl_shm);
+	if (plugin_gtk->wl_shm)
+		wl_shm_destroy(plugin_gtk->wl_shm);
 
-	wl_compositor_destroy(plugin_gtk->wl_compositor);
-	wl_subcompositor_destroy(plugin_gtk->wl_subcompositor);
+	if (plugin_gtk->wl_compositor)
+		wl_compositor_destroy(plugin_gtk->wl_compositor);
+	if (plugin_gtk->wl_subcompositor)
+		wl_subcompositor_destroy(plugin_gtk->wl_subcompositor);
 
 
 	free(plugin_gtk);
