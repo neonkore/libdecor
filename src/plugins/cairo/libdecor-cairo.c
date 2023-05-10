@@ -398,12 +398,15 @@ libdecor_plugin_cairo_destroy(struct libdecor_plugin *plugin)
 
 	free(plugin_cairo->cursor_theme_name);
 
-	wl_shm_destroy(plugin_cairo->wl_shm);
+	if (plugin_cairo->wl_shm)
+		wl_shm_destroy(plugin_cairo->wl_shm);
 
 	pango_font_description_free(plugin_cairo->font);
 
-	wl_compositor_destroy(plugin_cairo->wl_compositor);
-	wl_subcompositor_destroy(plugin_cairo->wl_subcompositor);
+	if (plugin_cairo->wl_compositor)
+		wl_compositor_destroy(plugin_cairo->wl_compositor);
+	if (plugin_cairo->wl_subcompositor)
+		wl_subcompositor_destroy(plugin_cairo->wl_subcompositor);
 
 	libdecor_plugin_release(&plugin_cairo->plugin);
 	free(plugin_cairo);
