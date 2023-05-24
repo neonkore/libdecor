@@ -675,6 +675,7 @@ libdecor_plugin_gtk_frame_free(struct libdecor_plugin *plugin,
 	}
 
 	free(frame_gtk->title);
+	frame_gtk->title = NULL;
 
 	frame_gtk->decoration_type = DECORATION_TYPE_NONE;
 
@@ -1530,10 +1531,9 @@ libdecor_plugin_gtk_frame_property_changed(struct libdecor_plugin *plugin,
 	if (!streq(frame_gtk->title, new_title))
 		redraw_needed = true;
 	free(frame_gtk->title);
+	frame_gtk->title = NULL;
 	if (new_title)
 		frame_gtk->title = strdup(new_title);
-	else
-		frame_gtk->title = NULL;
 
 	if (frame_gtk->capabilities != libdecor_frame_get_capabilities(frame)) {
 		frame_gtk->capabilities = libdecor_frame_get_capabilities(frame);
