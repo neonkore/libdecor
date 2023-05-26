@@ -2104,6 +2104,7 @@ pointer_leave(void *data,
 	if (frame_gtk) {
 		frame_gtk->active = NULL;
 		frame_gtk->hdr_focus.widget = NULL;
+		frame_gtk->hdr_focus.type = HEADER_NONE;
 		draw_decoration(frame_gtk);
 		libdecor_frame_toplevel_commit(&frame_gtk->frame);
 		update_local_cursor(seat);
